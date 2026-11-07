@@ -1,0 +1,12 @@
+fastapi
+uvicorn[standard]
+pandas
+python-multipart
+pydantic-settings
+sqlalchemy
+psycopg2-binary
+pyspark
+pyarrow
+python-dotenv
+pytest
+httpx

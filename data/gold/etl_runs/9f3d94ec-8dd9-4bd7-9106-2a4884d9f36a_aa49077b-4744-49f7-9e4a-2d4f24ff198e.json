@@ -1,0 +1,12 @@
+{
+    "dataset_id": "9f3d94ec-8dd9-4bd7-9106-2a4884d9f36a",
+    "version_id": "973b9ae0-4ade-48c1-ac09-9757bc95264e",
+    "job_id": "ea6704d9-ec44-4625-854a-bb02d28e25c7",
+    "batch_id": "aa49077b-4744-49f7-9e4a-2d4f24ff198e",
+    "status": "success",
+    "finished_at": "2026-11-07T20:55:41.374181+00:00",
+    "profile": "/home/vika/Документы/ekover_starter/data/gold/column_profile/9f3d94ec-8dd9-4bd7-9106-2a4884d9f36a.json",
+    "quality_report": "/home/vika/Документы/ekover_starter/data/gold/data_quality/9f3d94ec-8dd9-4bd7-9106-2a4884d9f36a_aa49077b-4744-49f7-9e4a-2d4f24ff198e.json",
+    "bronze_path": "/home/vika/Документы/ekover_starter/data/bronze/9f3d94ec-8dd9-4bd7-9106-2a4884d9f36a/batch_id=aa49077b-4744-49f7-9e4a-2d4f24ff198e",
+    "silver_path": "/home/vika/Документы/ekover_starter/data/silver/9f3d94ec-8dd9-4bd7-9106-2a4884d9f36a/batch_id=aa49077b-4744-49f7-9e4a-2d4f24ff198e"
+}

@@ -1,0 +1,121 @@
+{
+    "dataset_id": "e4237b95-c393-450a-96bc-3bfd8b28fdb1",
+    "row_count": 3276,
+    "column_count": 14,
+    "columns": [
+        {
+            "name": "ph",
+            "type": "double",
+            "null_count": 491,
+            "unique_count_approx": 2718,
+            "min": 0.0,
+            "max": 13.999999999999998,
+            "average": 7.080794504276842
+        },
+        {
+            "name": "hardness",
+            "type": "double",
+            "null_count": 0,
+            "unique_count_approx": 3229,
+            "min": 47.432,
+            "max": 323.124,
+            "average": 196.36949601730225
+        },
+        {
+            "name": "solids",
+            "type": "double",
+            "null_count": 0,
+            "unique_count_approx": 3172,
+            "min": 320.942611274359,
+            "max": 61227.19600771213,
+            "average": 22014.09252607711
+        },
+        {
+            "name": "chloramines",
+            "type": "double",
+            "null_count": 0,
+            "unique_count_approx": 3428,
+            "min": 0.3520000000000003,
+            "max": 13.127000000000002,
+            "average": 7.122276793425777
+        },
+        {
+            "name": "sulfate",
+            "type": "double",
+            "null_count": 781,
+            "unique_count_approx": 2448,
+            "min": 129.00000000000003,
+            "max": 481.03064230599716,
+            "average": 333.77577661081307
+        },
+        {
+            "name": "conductivity",
+            "type": "double",
+            "null_count": 0,
+            "unique_count_approx": 3118,
+            "min": 181.483753985146,
+            "max": 753.3426195583046,
+            "average": 426.20511068255325
+        },
+        {
+            "name": "organic_carbon",
+            "type": "double",
+            "null_count": 0,
+            "unique_count_approx": 3261,
+            "min": 2.1999999999999886,
+            "max": 28.30000000000001,
+            "average": 14.284970247677323
+        },
+        {
+            "name": "trihalomethanes",
+            "type": "double",
+            "null_count": 162,
+            "unique_count_approx": 2929,
+            "min": 0.7379999999999995,
+            "max": 124.0,
+            "average": 66.39629294676793
+        },
+        {
+            "name": "turbidity",
+            "type": "double",
+            "null_count": 0,
+            "unique_count_approx": 3309,
+            "min": 1.45,
+            "max": 6.739,
+            "average": 3.966786169791062
+        },
+        {
+            "name": "potability",
+            "type": "int",
+            "null_count": 0,
+            "unique_count_approx": 2,
+            "min": 0,
+            "max": 1,
+            "average": 0.3901098901098901
+        },
+        {
+            "name": "_dataset_id",
+            "type": "string",
+            "null_count": 0,
+            "unique_count_approx": 1
+        },
+        {
+            "name": "_batch_id",
+            "type": "string",
+            "null_count": 0,
+            "unique_count_approx": 1
+        },
+        {
+            "name": "_ingested_at",
+            "type": "timestamp",
+            "null_count": 0,
+            "unique_count_approx": 1
+        },
+        {
+            "name": "_source_file",
+            "type": "string",
+            "null_count": 0,
+            "unique_count_approx": 1
+        }
+    ]
+}

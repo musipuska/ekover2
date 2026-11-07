@@ -1,0 +1,9 @@
+{
+    "dataset_id": "9f3d94ec-8dd9-4bd7-9106-2a4884d9f36a",
+    "batch_id": "aa49077b-4744-49f7-9e4a-2d4f24ff198e",
+    "bronze_rows": 1000,
+    "silver_rows": 1000,
+    "removed_duplicates": 0,
+    "null_cells_after_cleaning": 0,
+    "quality_status": "success"
+}

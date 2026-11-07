@@ -1,0 +1,9 @@
+{
+    "dataset_id": "e4237b95-c393-450a-96bc-3bfd8b28fdb1",
+    "batch_id": "19c87b6a-767a-483e-8588-51785eb0697a",
+    "bronze_rows": 3276,
+    "silver_rows": 3276,
+    "removed_duplicates": 0,
+    "null_cells_after_cleaning": 1434,
+    "quality_status": "success"
+}

@@ -1,0 +1,68 @@
+{
+    "dataset_id": "9f3d94ec-8dd9-4bd7-9106-2a4884d9f36a",
+    "batch_id": "aa49077b-4744-49f7-9e4a-2d4f24ff198e",
+    "row_count": 1000,
+    "column_count": 6,
+    "columns": [
+        {
+            "name": "id",
+            "data_type": "int",
+            "null_count": 0,
+            "null_percent": 0.0,
+            "unique_count": 1026,
+            "min_value": 1,
+            "max_value": 1000,
+            "average_value": 500.5
+        },
+        {
+            "name": "target",
+            "data_type": "string",
+            "null_count": 0,
+            "null_percent": 0.0,
+            "unique_count": 2,
+            "min_value": null,
+            "max_value": null,
+            "average_value": null
+        },
+        {
+            "name": "_dataset_id",
+            "data_type": "string",
+            "null_count": 0,
+            "null_percent": 0.0,
+            "unique_count": 1,
+            "min_value": null,
+            "max_value": null,
+            "average_value": null
+        },
+        {
+            "name": "_batch_id",
+            "data_type": "string",
+            "null_count": 0,
+            "null_percent": 0.0,
+            "unique_count": 1,
+            "min_value": null,
+            "max_value": null,
+            "average_value": null
+        },
+        {
+            "name": "_ingested_at",
+            "data_type": "timestamp",
+            "null_count": 0,
+            "null_percent": 0.0,
+            "unique_count": 1,
+            "min_value": null,
+            "max_value": null,
+            "average_value": null
+        },
+        {
+            "name": "_source_file",
+            "data_type": "string",
+            "null_count": 0,
+            "null_percent": 0.0,
+            "unique_count": 1,
+            "min_value": null,
+            "max_value": null,
+            "average_value": null
+        }
+    ]
+}
