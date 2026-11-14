@@ -40,6 +40,8 @@ function Status({ value }) {
     queued: "Ожидает",
     running: "Выполняется",
     success: "Успешно",
+    passed: "Пройдено",
+    warning: "Предупреждение",
     failed: "Ошибка",
     cancelled: "Отменено",
     unknown: "Неизвестно",

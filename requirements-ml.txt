@@ -1,0 +1,3 @@
+# Optional ML dependencies; install into the backend environment.
+scikit-learn>=1.4,<2.0
+

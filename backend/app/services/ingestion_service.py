@@ -4,20 +4,14 @@ import io
 import logging
 import re
 import uuid
-
 from pathlib import Path
+
 from sqlalchemy.orm import Session
 
 from backend.app.core.exceptions import InvalidFileError
-from backend.app.infrastructure.database.models import (
-    Dataset,
-    DatasetVersion,
-    ETLJob
-)
+from backend.app.infrastructure.database.models import Dataset, DatasetVersion, ETLJob
 from backend.app.infrastructure.storage.base import StorageInterface
-from backend.app.repositories import dataset_repository
-from backend.app.repositories import job_repository
-
+from backend.app.repositories import dataset_repository, job_repository
 
 logger = logging.getLogger(__name__)
 
@@ -116,7 +110,10 @@ def upload_dataset(
             dataset_id=dataset_id,
             source_uri=saved_uri,
             file_format="csv",
-            checksum=checksum
+            checksum=checksum,
+            source_filename=safe_filename(filename),
+            file_size_bytes=len(content),
+            schema_version="1.0"
         )
 
         job = ETLJob(

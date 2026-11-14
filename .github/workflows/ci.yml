@@ -1,0 +1,37 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: pip install -r backend/requirements.txt ruff
+      - run: ruff check backend tests airflow
+      - run: python -m pytest tests -q --ignore=tests/test_airflow_dags.py
+
+  airflow-dags:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install "apache-airflow==2.10.5" pytest \
+            --constraint https://raw.githubusercontent.com/apache/airflow/constraints-2.10.5/constraints-3.12.txt
+      - run: airflow db migrate
+      - run: python -m pytest tests/test_airflow_dags.py --noconftest -q
+        env:
+          AIRFLOW__CORE__LOAD_EXAMPLES: "False"

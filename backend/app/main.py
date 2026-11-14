@@ -1,21 +1,23 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.envelope import ApiError, api_error_handler
 from backend.app.api.router import api_router
 from backend.app.core.config import settings
 from backend.app.core.logging import setup_logging
-from backend.app.infrastructure.database.session import (
-    Base,
-    engine
-)
 
 # Импорт моделей необходим для регистрации таблиц SQLAlchemy.
 from backend.app.infrastructure.database import models  # noqa: F401
-
+from backend.app.infrastructure.database.session import (
+    Base,
+    engine,
+    ensure_schema,
+)
 
 setup_logging()
 
 Base.metadata.create_all(bind=engine)
+ensure_schema(engine)
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -23,6 +25,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
+
+app.add_exception_handler(ApiError, api_error_handler)
 
 app.add_middleware(
     CORSMiddleware,

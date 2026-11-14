@@ -1,9 +1,11 @@
 
 from fastapi import APIRouter, HTTPException
 
-from backend.app.schemas.quality import DatasetQuality
-from backend.app.services.quality_service import get_dataset_quality
-
+from backend.app.schemas.quality import BatchSummary, DatasetQuality
+from backend.app.services.quality_service import (
+    get_dataset_batches,
+    get_dataset_quality,
+)
 
 router = APIRouter(
     prefix="/datasets",
@@ -27,3 +29,13 @@ def get_quality(dataset_id: str, batch_id: str):
         )
 
     return report
+
+
+@router.get(
+    "/{dataset_id}/batches",
+    response_model=list[BatchSummary],
+)
+def get_batches(dataset_id: str):
+    """Возвращает историю batch набора данных с результатами quality gate."""
+
+    return get_dataset_batches(dataset_id)

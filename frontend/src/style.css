@@ -431,6 +431,16 @@ td {
   background: #e7f5eb;
 }
 
+.status-passed {
+  color: #237547;
+  background: #e7f5eb;
+}
+
+.status-warning {
+  color: #946b17;
+  background: #fff4d9;
+}
+
 .status-running {
   color: #946b17;
   background: #fff4d9;
