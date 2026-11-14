@@ -1,4 +1,5 @@
-from pydantic import BaseModel
+
+from pydantic import BaseModel, Field
 
 
 class ColumnProfile(BaseModel):
@@ -20,6 +21,8 @@ class DatasetProfile(BaseModel):
     dataset_id: str
     batch_id: str
     version_id: str | None = None
+
     row_count: int
     column_count: int
-    columns: list[ColumnProfile]
+
+    columns: list[ColumnProfile] = Field(default_factory=list)

@@ -1,5 +1,4 @@
-from pydantic import BaseModel
-
+from pydantic import BaseModel, Field
 
 class QualityRuleResult(BaseModel):
     rule: str
@@ -31,7 +30,7 @@ class DatasetQuality(BaseModel):
     checks_passed: int | None = None
     checks_failed: int | None = None
     checks_skipped: int | None = None
-    results: list[QualityRuleResult] = []
+    results: list[QualityRuleResult] = Field(default_factory=list)
 
 
 class BatchSummary(BaseModel):
