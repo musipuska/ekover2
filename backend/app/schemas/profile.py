@@ -19,6 +19,7 @@ class DatasetProfile(BaseModel):
 
     dataset_id: str
     batch_id: str
+    version_id: str | None = None
     row_count: int
     column_count: int
     columns: list[ColumnProfile]

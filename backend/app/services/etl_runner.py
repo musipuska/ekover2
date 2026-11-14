@@ -2,12 +2,11 @@
 import logging
 import subprocess
 import sys
-
 from pathlib import Path
 
-from backend.app.infrastructure.database.session import SessionLocal
+from backend.app.core.config import settings
 from backend.app.infrastructure.database.models import ETLJob
-
+from backend.app.infrastructure.database.session import SessionLocal
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +21,14 @@ def start_etl_process(
     batch_id: str,
 ) -> None:
     """
-    Запускает ETL в отдельном процессе Python.
+    Запускает ETL в отдельном процессе Python или через Airflow.
     """
+
+    if settings.ORCHESTRATOR.lower() == "airflow":
+        from backend.app.services.orchestrator_service import start_etl_via_airflow
+
+        start_etl_via_airflow(dataset_id, version_id, job_id, batch_id)
+        return
 
     log_directory = PROJECT_ROOT / "data" / "logs"
     log_directory.mkdir(parents=True, exist_ok=True)

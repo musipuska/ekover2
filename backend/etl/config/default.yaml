@@ -1,0 +1,56 @@
+dataset: water_measurements
+
+business_key: []
+timestamp_columns: []
+required_columns: []
+allow_warning_downstream: true
+
+rules:
+  - name: dataset_not_empty
+    rule: min_rows
+    threshold: 1
+    severity: critical
+
+  - name: ph_physical_range
+    column: ph
+    rule: between
+    min: 0
+    max: 14
+    severity: warning
+    quarantine: true
+
+  - name: hardness_non_negative
+    column: hardness
+    rule: between
+    min: 0
+    severity: warning
+
+  - name: turbidity_non_negative
+    column: turbidity
+    rule: between
+    min: 0
+    severity: warning
+
+  - name: conductivity_non_negative
+    column: conductivity
+    rule: between
+    min: 0
+    severity: warning
+
+  - name: temperature_physical_range
+    column: temperature
+    rule: between
+    min: -5
+    max: 100
+    severity: warning
+
+  - name: ph_null_ratio
+    column: ph
+    rule: max_null_ratio
+    threshold: 0.5
+    severity: warning
+
+  - name: measured_at_not_in_future
+    column: measured_at
+    rule: not_in_future
+    severity: warning
