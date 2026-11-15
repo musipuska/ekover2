@@ -8,5 +8,5 @@ ENV JAVA_HOME=/usr/lib/jvm/default-java
 
 USER airflow
 COPY backend/requirements.txt requirements-ml.txt /tmp/
-RUN pip install --no-cache-dir -r /tmp/requirements.txt -r /tmp/requirements-ml.txt
+RUN pip install --no-cache-dir --default-timeout=1000 --retries 10 -r /tmp/requirements.txt -r /tmp/requirements-ml.txt
 ENV PYTHONPATH=/opt/ekover
