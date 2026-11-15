@@ -1,8 +1,20 @@
 from pathlib import Path
 
-from pyspark.sql import DataFrame, SparkSession
-from pyspark.sql.functions import coalesce, col, concat_ws, current_timestamp, lit, sha2
-from pyspark.sql.types import LongType, StructField, StructType
+from pyspark.sql import DataFrame, SparkSession, Window
+from pyspark.sql.functions import (
+    coalesce,
+    col,
+    concat_ws,
+    count,
+    create_map,
+    current_timestamp,
+    lit,
+    monotonically_increasing_id,
+    row_number,
+    sha2,
+    spark_partition_id,
+)
+from pyspark.sql.types import StructType
 
 from backend.etl.common.run_context import RunContext
 
@@ -43,11 +55,32 @@ def read_source_csv(
 
 
 def add_row_numbers(spark: SparkSession, df: DataFrame) -> DataFrame:
-    schema = StructType(
-        [StructField("_source_row_number", LongType(), False), *df.schema.fields]
+    """Сквозной номер строки 1..N в порядке чтения файла без RDD и без одного раздела.
+
+    Номера внутри раздела считаются оконной функцией, смещения разделов —
+    из небольшой таблицы количеств строк по разделам.
+    """
+    tagged = df.withColumn("__pid", spark_partition_id()).withColumn(
+        "__mid", monotonically_increasing_id()
     )
-    indexed = df.rdd.zipWithIndex().map(lambda item: (item[1] + 1, *item[0]))
-    return spark.createDataFrame(indexed, schema)
+    counts = {
+        row["__pid"]: row["cnt"]
+        for row in tagged.groupBy("__pid").agg(count(lit(1)).alias("cnt")).collect()
+    }
+    offsets: dict[int, int] = {}
+    running = 0
+    for pid in sorted(counts):
+        offsets[pid] = running
+        running += counts[pid]
+
+    offset_map = create_map(*[x for pid, off in offsets.items() for x in (lit(pid), lit(off))])
+    window = Window.partitionBy("__pid").orderBy("__mid")
+    numbered = tagged.withColumn(
+        "_source_row_number",
+        (row_number().over(window) + offset_map[col("__pid")]).cast("long"),
+    ).drop("__pid", "__mid")
+    ordered = ["_source_row_number", *[name for name in df.columns]]
+    return numbered.select(*[col(f"`{name}`") for name in ordered])
 
 
 def add_technical_columns(

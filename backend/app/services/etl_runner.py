@@ -21,24 +21,13 @@ def start_etl_process(
     batch_id: str,
 ) -> None:
     """
-    Запускает полный ETL-конвейер:
-    Validation -> Bronze -> Silver -> Quality -> Gold.
-
-    Запуск выполняется в отдельном процессе Python
-    либо через Airflow, если он указан в настройках.
+    Запускает ETL в отдельном процессе Python или через Airflow.
     """
 
     if settings.ORCHESTRATOR.lower() == "airflow":
-        from backend.app.services.orchestrator_service import (
-            start_etl_via_airflow,
-        )
+        from backend.app.services.orchestrator_service import start_etl_via_airflow
 
-        start_etl_via_airflow(
-            dataset_id,
-            version_id,
-            job_id,
-            batch_id,
-        )
+        start_etl_via_airflow(dataset_id, version_id, job_id, batch_id)
         return
 
     log_directory = PROJECT_ROOT / "data" / "logs"
@@ -46,19 +35,14 @@ def start_etl_process(
 
     log_path = log_directory / f"etl_{job_id}.log"
 
-    # Используем новый модуль полного ETL-конвейера.
     command = [
         sys.executable,
         "-m",
-        "backend.etl.jobs.full_pipeline",
-        "--dataset-id",
-        dataset_id,
-        "--version-id",
-        version_id,
-        "--job-id",
-        job_id,
-        "--batch-id",
-        batch_id,
+        "backend.etl.jobs.csv_to_lake",
+        "--dataset-id", dataset_id,
+        "--version-id", version_id,
+        "--job-id", job_id,
+        "--batch-id", batch_id,
     ]
 
     try:
@@ -72,7 +56,7 @@ def start_etl_process(
             )
 
         logger.info(
-            "Full ETL pipeline started: job_id=%s pid=%s",
+            "ETL process started: job_id=%s pid=%s",
             job_id,
             process.pid,
         )

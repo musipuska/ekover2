@@ -5,6 +5,7 @@ import pandas as pd
 from backend.app.core.config import settings
 from backend.etl.common.exceptions import QualityGateError
 from backend.etl.common.publish import read_json
+from backend.etl.common.versions import resolve_published
 
 
 class DataNotReadyError(QualityGateError):
@@ -39,5 +40,5 @@ def load_curated(
             "Batch не прошёл quality gate",
             {"quality_status": status},
         )
-    frame = pd.read_parquet(directory / "published" / "measurements")
+    frame = pd.read_parquet(resolve_published(directory) / "measurements")
     return frame, manifest

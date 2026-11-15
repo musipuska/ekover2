@@ -5,9 +5,11 @@ import logging
 import re
 import uuid
 from pathlib import Path
+from typing import BinaryIO
 
 from sqlalchemy.orm import Session
 
+from backend.app.core.config import settings
 from backend.app.core.exceptions import InvalidFileError
 from backend.app.infrastructure.database.models import Dataset, DatasetVersion, ETLJob
 from backend.app.infrastructure.storage.base import StorageInterface
@@ -16,41 +18,87 @@ from backend.app.repositories import dataset_repository, job_repository
 logger = logging.getLogger(__name__)
 
 
-def validate_csv(filename: str, content: bytes) -> None:
-    """Проверяет формат, размер и читаемость CSV-файла."""
+CHUNK_SIZE = 1024 * 1024
+
+
+def validate_csv_file(filename: str, path: Path) -> None:
+    """Проверяет формат и читаемость CSV построчно, не загружая файл в память."""
 
     if Path(filename).suffix.lower() != ".csv":
         raise InvalidFileError("Можно загружать только CSV-файлы.")
 
-    if not content:
-        raise InvalidFileError("Файл пустой.")
-
-    if len(content) > 50 * 1024 * 1024:
-        raise InvalidFileError("Размер файла превышает 50 МБ.")
-
     try:
-        decoded = content.decode("utf-8-sig")
-        reader = csv.reader(io.StringIO(decoded))
+        with path.open("r", encoding="utf-8-sig", newline="") as file:
+            reader = csv.reader(file)
+            header = next(reader, None)
 
-        header = next(reader, None)
+            if not header or not any(cell.strip() for cell in header):
+                raise InvalidFileError("В CSV отсутствует заголовок.")
 
-        if not header or not any(cell.strip() for cell in header):
-            raise InvalidFileError("В CSV отсутствует заголовок.")
+            if len(set(header)) != len(header):
+                raise InvalidFileError(
+                    "В CSV обнаружены повторяющиеся названия колонок."
+                )
 
-        if len(set(header)) != len(header):
-            raise InvalidFileError(
-                "В CSV обнаружены повторяющиеся названия колонок."
-            )
-
-        if not any(reader):
-            raise InvalidFileError("В CSV отсутствуют строки с данными.")
-
+            if not any(True for _ in reader):
+                raise InvalidFileError("В CSV отсутствуют строки с данными.")
     except UnicodeDecodeError as error:
         raise InvalidFileError(
             "Не удалось прочитать файл. Поддерживается UTF-8."
         ) from error
     except csv.Error as error:
         raise InvalidFileError("Некорректный CSV-файл.") from error
+
+
+def validate_csv(filename: str, content: bytes) -> None:
+    """Проверка CSV из байтов (для небольших файлов и тестов)."""
+
+    if not content:
+        raise InvalidFileError("Файл пустой.")
+    if len(content) > settings.MAX_UPLOAD_SIZE:
+        raise InvalidFileError(_size_message())
+
+    import tempfile
+
+    with tempfile.NamedTemporaryFile(suffix=".csv", delete=False) as handle:
+        handle.write(content)
+        path = Path(handle.name)
+    try:
+        validate_csv_file(filename, path)
+    finally:
+        path.unlink(missing_ok=True)
+
+
+def _size_message() -> str:
+    return f"Размер файла превышает {settings.MAX_UPLOAD_SIZE // (1024 * 1024)} МБ."
+
+
+def receive_stream(stream: BinaryIO) -> tuple[Path, str, int]:
+    """Копирует поток во временный файл, считая SHA-256 и размер на лету.
+
+    При превышении MAX_UPLOAD_SIZE или ошибке временный файл удаляется.
+    """
+
+    import tempfile
+
+    digest = hashlib.sha256()
+    size = 0
+    handle = tempfile.NamedTemporaryFile(suffix=".csv", delete=False)
+    path = Path(handle.name)
+    try:
+        with handle:
+            while chunk := stream.read(CHUNK_SIZE):
+                size += len(chunk)
+                if size > settings.MAX_UPLOAD_SIZE:
+                    raise InvalidFileError(_size_message())
+                digest.update(chunk)
+                handle.write(chunk)
+        if size == 0:
+            raise InvalidFileError("Файл пустой.")
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    return path, digest.hexdigest(), size
 
 
 def safe_filename(filename: str) -> str:
@@ -68,30 +116,44 @@ def upload_dataset(
     filename: str,
     content: bytes
 ) -> dict:
-    """Сохраняет исходный CSV и регистрирует задачу обработки."""
+    """Совместимая обёртка: загрузка из байтов."""
 
-    validate_csv(filename, content)
+    return upload_stream(db, storage, filename, io.BytesIO(content))
+
+
+def upload_stream(
+    db: Session,
+    storage: StorageInterface,
+    filename: str,
+    stream: BinaryIO,
+) -> dict:
+    """Потоково принимает CSV, сохраняет его и регистрирует задачу обработки."""
+
+    temporary_path, checksum, size = receive_stream(stream)
+    try:
+        validate_csv_file(filename, temporary_path)
+        return _register_upload(db, storage, filename, temporary_path, checksum, size)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+
+
+def _register_upload(
+    db: Session,
+    storage: StorageInterface,
+    filename: str,
+    temporary_path: Path,
+    checksum: str,
+    size: int,
+) -> dict:
 
     dataset_id = str(uuid.uuid4())
     version_id = str(uuid.uuid4())
     job_id = str(uuid.uuid4())
     batch_id = str(uuid.uuid4())
 
-    checksum = hashlib.sha256(content).hexdigest()
-
-    temporary_path = None
     saved_uri = None
 
     try:
-        import tempfile
-
-        with tempfile.NamedTemporaryFile(
-            suffix=".csv",
-            delete=False
-        ) as temporary_file:
-            temporary_file.write(content)
-            temporary_path = Path(temporary_file.name)
-
         destination = (
             f"raw/{dataset_id}/{version_id}_"
             f"{safe_filename(filename)}"
@@ -112,7 +174,7 @@ def upload_dataset(
             file_format="csv",
             checksum=checksum,
             source_filename=safe_filename(filename),
-            file_size_bytes=len(content),
+            file_size_bytes=size,
             schema_version="1.0"
         )
 
@@ -155,7 +217,3 @@ def upload_dataset(
                 logger.exception("Не удалось удалить файл после ошибки.")
 
         raise
-
-    finally:
-        if temporary_path:
-            temporary_path.unlink(missing_ok=True)

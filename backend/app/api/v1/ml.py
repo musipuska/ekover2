@@ -1,16 +1,22 @@
+import hashlib
+import hmac
 import json
+import logging
+import traceback
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Query
+from fastapi import APIRouter, BackgroundTasks, Header, Query
 from pydantic import BaseModel, Field
 
 from backend.app.api.envelope import ApiError, ok
+from backend.app.core.config import settings
 from backend.ml.features import FeatureConfig
 from backend.ml.inference import batch_predict, read_predictions
 from backend.ml.registry import ModelRegistry, RegistryError
 from backend.ml.training import DEFAULT_MODEL_NAME, read_run, save_run, train_model
 
 router = APIRouter(prefix="/ml", tags=["ML"])
+logger = logging.getLogger(__name__)
 
 
 class TrainingRequest(BaseModel):
@@ -31,8 +37,17 @@ class InferenceRequest(BaseModel):
 
 class StatusChange(BaseModel):
     status: str
-    approved_by: str | None = None
     comment: str | None = None
+
+
+def require_admin(x_api_key: str | None) -> str:
+    """Проверяет ключ администратора и возвращает идентификатор утверждающего."""
+    configured = settings.ADMIN_API_KEY
+    if not configured:
+        raise ApiError("ADMIN_DISABLED", "Смена статуса модели отключена: ADMIN_API_KEY не задан", 403)
+    if not x_api_key or not hmac.compare_digest(x_api_key, configured):
+        raise ApiError("FORBIDDEN", "Неверный или отсутствующий API-ключ", 403)
+    return "admin:" + hashlib.sha256(configured.encode("utf-8")).hexdigest()[:8]
 
 
 def _slim(model: dict) -> dict:
@@ -60,9 +75,15 @@ def get_model(model_name: str):
 
 
 @router.post("/models/{model_name}/versions/{version}/status")
-def change_status(model_name: str, version: str, body: StatusChange):
+def change_status(
+    model_name: str,
+    version: str,
+    body: StatusChange,
+    x_api_key: str | None = Header(default=None),
+):
+    approver = require_admin(x_api_key)
     try:
-        metadata = ModelRegistry().set_status(model_name, version, body.status, body.approved_by, body.comment)
+        metadata = ModelRegistry().set_status(model_name, version, body.status, approver, body.comment)
     except RegistryError as error:
         raise ApiError("MODEL_STATUS_REJECTED", str(error), 409) from error
     return ok({k: v for k, v in metadata.items() if k != "feature_stats"})
@@ -121,7 +142,13 @@ def _run_training(run_id: str, body: TrainingRequest) -> None:
             run_id=run_id,
         )
     except Exception:
-        pass
+        # train_model уже записал run со статусом failed и текстом ошибки;
+        # здесь сохраняем traceback в лог и в run-запись.
+        trace = traceback.format_exc()
+        logger.error("Training run %s failed\n%s", run_id, trace)
+        record = read_run(run_id) or {"run_id": run_id, "kind": "training", "status": "failed"}
+        record["traceback"] = trace
+        save_run(record)
 
 
 def _run_inference(run_id: str, body: InferenceRequest) -> None:
@@ -142,7 +169,8 @@ def _run_inference(run_id: str, body: InferenceRequest) -> None:
         )
         record.update(status="completed", summary=summary)
     except Exception as error:
-        record.update(status="failed", error=str(error))
+        logger.exception("Inference run %s failed", run_id)
+        record.update(status="failed", error=str(error), traceback=traceback.format_exc())
     record["finished_at"] = datetime.now(timezone.utc).isoformat()
     save_run(record)
 

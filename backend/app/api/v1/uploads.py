@@ -13,7 +13,7 @@ from backend.app.dependencies import get_storage_dependency
 from backend.app.infrastructure.database.session import get_db
 from backend.app.infrastructure.storage.base import StorageInterface
 from backend.app.schemas.upload import UploadResponse
-from backend.app.services.ingestion_service import upload_dataset
+from backend.app.services.ingestion_service import upload_stream
 from backend.app.services.etl_runner import start_etl_process
 from backend.app.core.exceptions import InvalidFileError
 
@@ -37,14 +37,12 @@ async def upload_csv(
 ):
     """Принимает CSV, сохраняет его и запускает ETL."""
 
-    content = await file.read()
-
     try:
-        result = upload_dataset(
+        result = upload_stream(
             db=db,
             storage=storage,
             filename=file.filename or "dataset.csv",
-            content=content,
+            stream=file.file,
         )
 
         # Запускаем ETL только после успешной регистрации задачи в БД.

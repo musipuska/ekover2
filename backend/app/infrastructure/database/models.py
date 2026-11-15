@@ -72,6 +72,10 @@ class ETLJob(Base):
     quality_status = Column(String, nullable=True)
     orchestrator_run_id = Column(String, nullable=True)
     metrics = Column(Text, nullable=True)
+    # Раздельные статусы этапов: status = ETL, остальные заполняются своими DAG.
+    analytics_status = Column(String, nullable=True)
+    ml_status = Column(String, nullable=True)
+    pipeline_status = Column(String, nullable=True)
 
 
 class DataQualityResult(Base):

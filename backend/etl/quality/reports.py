@@ -3,7 +3,7 @@ from pyspark.sql.functions import col
 
 from backend.etl.common.publish import utc_now, write_json_atomic
 from backend.etl.common.run_context import RunContext
-from backend.etl.quality.gate import quality_score
+from backend.etl.quality.gate import critical_failures, quality_score, rule_coverage
 
 
 def count_null_cells(df: DataFrame, columns: list[str]) -> int:
@@ -41,6 +41,8 @@ def build_quality_report(
         "generated_at": utc_now(),
         "quality_status": status,
         "quality_score": quality_score(results),
+        "rule_coverage": rule_coverage(results),
+        "critical_failures": critical_failures(results),
         "gate_reason": gate_reason,
         "bronze_rows": bronze_rows,
         "silver_rows": silver_rows,

@@ -18,11 +18,12 @@ def _read_mart(mart: str, dataset_id: str | None = None, batch_id: str | None = 
     frames = []
     if not root.is_dir():
         return pd.DataFrame()
-    for path in root.glob("dataset_id=*/batch_id=*/data.parquet"):
-        if dataset_id and _partition_value(path, "dataset_id") != dataset_id:
-            continue
-        if batch_id and _partition_value(path, "batch_id") != batch_id:
-            continue
+    # Читаем только нужные партиции, а не весь mart.
+    for value in (dataset_id, batch_id):
+        if value and (any(sep in value for sep in "/\\*?[]") or value in {".", ".."}):
+            return pd.DataFrame()
+    pattern = f"dataset_id={dataset_id or '*'}/batch_id={batch_id or '*'}/data.parquet"
+    for path in root.glob(pattern):
         frame = pd.read_parquet(path)
         frame["dataset_id"] = _partition_value(path, "dataset_id")
         frame["batch_id"] = _partition_value(path, "batch_id")
