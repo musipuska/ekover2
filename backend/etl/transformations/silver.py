@@ -60,9 +60,26 @@ def standardize_timestamps(df: DataFrame, columns: list[str]) -> DataFrame:
     return df
 
 
-def deduplicate(df: DataFrame, business_key: list[str] | None = None) -> DataFrame:
+def resolve_strategy(strategy: str, business_key: list[str] | None) -> str:
+    if strategy == "auto":
+        return "business_key" if business_key else "full_row"
+    if strategy == "business_key" and not business_key:
+        raise ValueError("dedup_strategy=business_key требует business_key")
+    return strategy
+
+
+def deduplicate(
+    df: DataFrame,
+    business_key: list[str] | None = None,
+    strategy: str = "auto",
+) -> DataFrame:
+    strategy = resolve_strategy(strategy, business_key)
+    if strategy == "none":
+        return df
+    if strategy == "record_hash" and "_record_hash" in df.columns:
+        return df.dropDuplicates(["_record_hash"])
     key = [name for name in (business_key or []) if name in df.columns]
-    if key:
+    if strategy == "business_key" and key:
         order = col("_source_row_number").desc() if "_source_row_number" in df.columns else col(key[0])
         window = Window.partitionBy(*[col(f"`{name}`") for name in key]).orderBy(order)
         return (
@@ -78,12 +95,13 @@ def clean_silver_frame(
     df: DataFrame,
     business_key: list[str] | None = None,
     timestamp_columns: list[str] | None = None,
+    dedup_strategy: str = "auto",
 ) -> tuple[DataFrame, int]:
     df = normalize_columns(df)
     df = standardize_strings(df)
     df = standardize_timestamps(df, timestamp_columns or [])
     rows_before = df.count()
-    df = deduplicate(df, business_key)
+    df = deduplicate(df, business_key, dedup_strategy)
     return df, rows_before
 
 

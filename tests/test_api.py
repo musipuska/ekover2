@@ -78,3 +78,20 @@ def test_training_run_returns_job_id(monkeypatch):
 def test_training_run_validates_contamination():
     response = client.post("/api/v1/ml/training-runs", json={"dataset_id": "d", "batch_id": "b", "contamination": 0.9})
     assert response.status_code == 422
+
+
+def test_model_status_change_requires_admin_key(monkeypatch):
+    from fastapi.testclient import TestClient
+
+    from backend.app.core.config import settings
+    from backend.app.main import app
+
+    client = TestClient(app)
+    url = "/api/v1/ml/models/x/versions/1/status"
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "")
+    assert client.post(url, json={"status": "staging"}).status_code == 403
+    monkeypatch.setattr(settings, "ADMIN_API_KEY", "secret")
+    assert client.post(url, json={"status": "staging"}).status_code == 403
+    assert client.post(url, json={"status": "staging"}, headers={"X-API-Key": "bad"}).status_code == 403
+    # с верным ключом доходит до реестра (модели нет → 409)
+    assert client.post(url, json={"status": "staging"}, headers={"X-API-Key": "secret"}).status_code == 409

@@ -81,6 +81,13 @@ def _result(spec: RuleSpec, status: str, **fields) -> dict:
     }
 
 
+def _unavailable(spec: RuleSpec, message: str) -> dict:
+    """Правило нельзя выполнить: для critical это провал, иначе пропуск."""
+    status = "failed" if spec.severity == "critical" else "skipped"
+    return _result(spec, status, failed_rows=0 if status == "failed" else None,
+                   expected=_expected_text(spec), message=message)
+
+
 def _expected_text(spec: RuleSpec) -> str | None:
     if spec.rule == "between":
         return f"[{spec.min}, {spec.max}]"
@@ -120,10 +127,7 @@ def evaluate_rules(
             )
         elif spec.rule in ROW_RULES:
             if spec.column not in available:
-                results[spec.name] = _result(
-                    spec, "skipped", expected=_expected_text(spec),
-                    message=f"Столбец {spec.column} отсутствует",
-                )
+                results[spec.name] = _unavailable(spec, f"Столбец {spec.column} отсутствует")
                 continue
             condition = row_failure_condition(spec)
             aggregations.append(
@@ -134,10 +138,7 @@ def evaluate_rules(
                 quarantine = condition if quarantine is None else (quarantine | condition)
         elif spec.rule == "max_null_ratio":
             if spec.column not in available:
-                results[spec.name] = _result(
-                    spec, "skipped", expected=_expected_text(spec),
-                    message=f"Столбец {spec.column} отсутствует",
-                )
+                results[spec.name] = _unavailable(spec, f"Столбец {spec.column} отсутствует")
                 continue
             aggregations.append(
                 F.sum(F.when(_col(spec.column).isNull(), 1).otherwise(0)).alias(f"n::{spec.name}")
@@ -182,10 +183,7 @@ def evaluate_rules(
         elif spec.rule == "unique":
             columns = [name for name in (spec.columns or []) if name in available]
             if not spec.columns or len(columns) != len(spec.columns):
-                results[spec.name] = _result(
-                    spec, "skipped", expected=_expected_text(spec),
-                    message="Ключевые столбцы отсутствуют",
-                )
+                results[spec.name] = _unavailable(spec, "Ключевые столбцы отсутствуют")
                 continue
             grouped = df.groupBy(*[_col(name) for name in columns]).count()
             duplicates = grouped.filter(F.col("count") > 1).agg(

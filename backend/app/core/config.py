@@ -18,6 +18,10 @@ class Settings(BaseSettings):
 
     MAX_UPLOAD_SIZE: int = 50 * 1024 * 1024
 
+    # Ключ администратора для опасных операций (смена статуса модели).
+    # Пустой ключ = операция отключена.
+    ADMIN_API_KEY: str = ""
+
     ORCHESTRATOR: str = "local"
     AIRFLOW_API_URL: str = "http://localhost:8080/api/v1"
     AIRFLOW_USERNAME: str = "airflow"

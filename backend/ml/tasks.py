@@ -2,6 +2,7 @@ from backend.ml.features import FeatureConfig
 from backend.ml.inference import batch_predict, read_predictions
 from backend.ml.monitoring import monitor_batch
 from backend.ml.training import DEFAULT_MODEL_NAME, train_model
+from backend.etl.common.metadata import track_stage
 
 
 def _config(conf: dict) -> FeatureConfig:
@@ -15,6 +16,7 @@ def _required(conf: dict) -> tuple[str, str]:
     return conf["dataset_id"], conf["batch_id"]
 
 
+@track_stage("ml")
 def task_check_data(conf: dict) -> dict:
     from backend.ml.data import load_curated
 
@@ -23,6 +25,7 @@ def task_check_data(conf: dict) -> dict:
     return {"rows": int(len(frame)), "quality_status": manifest.get("quality_status")}
 
 
+@track_stage("ml")
 def task_train(conf: dict) -> dict:
     dataset_id, batch_id = _required(conf)
     record = train_model(
@@ -35,6 +38,7 @@ def task_train(conf: dict) -> dict:
     return {"model_version": record["model_version"], "run_id": record["run_id"]}
 
 
+@track_stage("ml")
 def task_inference(conf: dict, trained_version: str | None = None) -> dict:
     dataset_id, batch_id = _required(conf)
     summary = batch_predict(
@@ -47,6 +51,7 @@ def task_inference(conf: dict, trained_version: str | None = None) -> dict:
     return {key: summary[key] for key in ("model_version", "rows_scored", "anomaly_count", "anomaly_rate")}
 
 
+@track_stage("ml")
 def task_monitor(conf: dict, model_version: str | None = None) -> dict:
     dataset_id, batch_id = _required(conf)
     name = conf.get("model_name", DEFAULT_MODEL_NAME)

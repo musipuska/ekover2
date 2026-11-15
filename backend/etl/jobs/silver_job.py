@@ -15,7 +15,11 @@ from backend.etl.common.publish import (
 from backend.etl.common.run_context import RunContext
 from backend.etl.common.spark import managed_spark
 from backend.etl.common.stage import run_stage, timed
-from backend.etl.transformations.silver import clean_silver_frame, normalize_column_name
+from backend.etl.transformations.silver import (
+    clean_silver_frame,
+    normalize_column_name,
+    resolve_strategy,
+)
 
 logger = logging.getLogger("etl.silver")
 
@@ -48,7 +52,7 @@ def run_silver(
             bronze = session.read.parquet(str(ctx.published_dir("bronze")))
             try:
                 with timed(metrics, "transform_seconds"):
-                    cleaned, rows_in = clean_silver_frame(bronze, key, timestamps)
+                    cleaned, rows_in = clean_silver_frame(bronze, key, timestamps, config.dedup_strategy)
                     cleaned.write.mode("errorifexists").parquet(str(staging))
                 written = session.read.parquet(str(staging))
                 rows_out = written.count()
@@ -59,7 +63,7 @@ def run_silver(
                         "row_count": rows_out,
                         "rows_in": rows_in,
                         "removed_duplicates": rows_in - rows_out,
-                        "dedup_strategy": "business_key" if key else "full_row",
+                        "dedup_strategy": resolve_strategy(config.dedup_strategy, key),
                         "business_key": key,
                         "columns": written.columns,
                         "metrics": metrics,

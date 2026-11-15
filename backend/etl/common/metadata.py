@@ -84,6 +84,7 @@ def mark_job_finished(
         fields["quality_status"] = quality_status
     if metrics is not None:
         fields["metrics"] = metrics
+    fields["pipeline_status"] = derive_pipeline_status(status, None, None)
     update_job(job_id, **fields)
 
 
@@ -197,3 +198,60 @@ def source_path_for(version_info: dict) -> Path:
             {"source_uri": version_info["source_uri"]},
         )
     return path
+
+
+def derive_pipeline_status(etl: str | None, analytics: str | None, ml: str | None) -> str:
+    stages = [item for item in (etl, analytics, ml) if item]
+    if etl == "failed":
+        return "failed"
+    if "running" in stages or "queued" in stages:
+        return "running"
+    if "failed" in stages:
+        return "partial"  # ETL успешен, но аналитика или ML упали
+    return "success" if etl == "success" else (etl or "queued")
+
+
+def set_stage_status(batch_id: str, stage: str, status: str) -> None:
+    """Обновляет статус этапа analytics/ml для batch и пересчитывает pipeline_status."""
+    if stage not in {"analytics", "ml"}:
+        raise ValueError(f"Неизвестный этап: {stage}")
+    db = SessionLocal()
+    try:
+        job = (
+            db.query(ETLJob)
+            .filter(ETLJob.batch_id == batch_id)
+            .order_by(ETLJob.created_at.desc())
+            .first()
+        )
+        if job is None:
+            return
+        setattr(job, f"{stage}_status", status)
+        job.pipeline_status = derive_pipeline_status(job.status, job.analytics_status, job.ml_status)
+        db.commit()
+    finally:
+        db.close()
+
+
+def track_stage(stage: str):
+    """Декоратор task-функции: фиксирует running/success/failed для этапа."""
+    import functools
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(conf, *args, **kwargs):
+            batch_id = (conf or {}).get("batch_id")
+            if batch_id and func.__name__ in {"task_build_marts", "task_train"}:
+                set_stage_status(batch_id, stage, "running")
+            try:
+                result = func(conf, *args, **kwargs)
+            except BaseException:
+                if batch_id:
+                    set_stage_status(batch_id, stage, "failed")
+                raise
+            if batch_id and func.__name__ in {"task_validate_marts", "task_monitor"}:
+                set_stage_status(batch_id, stage, "success")
+            return result
+
+        return wrapper
+
+    return decorator

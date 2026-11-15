@@ -125,13 +125,14 @@ def test_rerun_is_idempotent_and_force_archives_previous(spark, register_csv):
     run_pipeline(*args, config=default_config(), spark=spark)
     second = json.loads(ctx.manifest_path("silver").read_text(encoding="utf-8"))
     assert first["attempt_id"] == second["attempt_id"]
-    assert not (ctx.layer_dir("silver") / "_archive").exists()
+    assert len(list((ctx.layer_dir("silver") / "versions").glob("*/"))) == 1
 
     run_pipeline(*args, config=default_config(), spark=spark, force=True)
     third = json.loads(ctx.manifest_path("silver").read_text(encoding="utf-8"))
     assert third["attempt_id"] != first["attempt_id"]
-    archived = list((ctx.layer_dir("silver") / "_archive").iterdir())
-    assert len(archived) == 1
+    versions = [p for p in (ctx.layer_dir("silver") / "versions").iterdir() if p.is_dir()]
+    assert len(versions) == 2
+    assert third["previous_attempt_id"] == first["attempt_id"]
     assert layer_rows(ctx, "silver") == 4
     assert not (ctx.layer_dir("silver") / "_attempts").exists() or not any(
         (ctx.layer_dir("silver") / "_attempts").iterdir()
@@ -260,3 +261,20 @@ def test_duplicate_column_names_are_made_unique(spark, register_csv):
     frame = pq.read_table(str(ctx.published_dir("gold") / "measurements")).to_pandas()
     business = [name for name in frame.columns if not name.startswith("_")]
     assert len(business) == len(set(business)) == 3
+
+
+def test_critical_rule_on_missing_column_fails_gate(spark, register_csv):
+    entry = register_csv(CSV)
+    config = PipelineConfig(
+        rules=[RuleSpec(name="need_x", rule="not_null", column="no_such_column", severity="critical")]
+    )
+    with pytest.raises(QualityGateError):
+        run_pipeline(
+            entry["dataset_id"], entry["version_id"], entry["job_id"], entry["batch_id"],
+            config=config, spark=spark,
+        )
+    ctx = make_ctx(entry)
+    report = json.loads((ctx.layer_dir("gold") / "quality_report.json").read_text(encoding="utf-8"))
+    assert report["quality_status"] == "failed"
+    assert report["critical_failures"] == 1
+    assert report["quality_score"] == 0.0

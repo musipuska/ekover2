@@ -4,6 +4,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 from backend.app.core.config import settings
+from backend.etl.common.versions import resolve_published, version_path
 
 LAYERS = ("bronze", "silver", "quarantine", "gold")
 
@@ -19,6 +20,8 @@ class RunContext:
     data_root: str = field(default_factory=lambda: settings.DATA_LAKE_PATH)
     attempt_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
     orchestrator_run_id: str | None = None
+    config_checksum: str | None = None
+    code_version: str | None = None
 
     @property
     def run_key(self) -> str:
@@ -38,8 +41,11 @@ class RunContext:
     def staging_dir(self, layer: str) -> Path:
         return self.layer_dir(layer) / "_attempts" / self.attempt_id
 
+    def version_dir(self, layer: str) -> Path:
+        return version_path(self.layer_dir(layer), self.attempt_id)
+
     def published_dir(self, layer: str) -> Path:
-        return self.layer_dir(layer) / "published"
+        return resolve_published(self.layer_dir(layer))
 
     def manifest_path(self, layer: str) -> Path:
         return self.layer_dir(layer) / "manifest.json"

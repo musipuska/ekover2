@@ -30,10 +30,18 @@ class PipelineConfig:
     required_columns: list[str] = field(default_factory=list)
     rules: list[RuleSpec] = field(default_factory=list)
     allow_warning_downstream: bool = True
+    # auto | none | business_key | full_row | record_hash
+    dedup_strategy: str = "auto"
+
+
+DEDUP_STRATEGIES = {"auto", "none", "business_key", "full_row", "record_hash"}
 
 
 def parse_config(payload: dict) -> PipelineConfig:
     rules = [RuleSpec(**item) for item in payload.get("rules", [])]
+    strategy = payload.get("dedup_strategy", "auto")
+    if strategy not in DEDUP_STRATEGIES:
+        raise ValueError(f"Неизвестная dedup_strategy: {strategy}")
     return PipelineConfig(
         dataset=payload.get("dataset", "default"),
         business_key=list(payload.get("business_key", [])),
@@ -41,6 +49,7 @@ def parse_config(payload: dict) -> PipelineConfig:
         required_columns=list(payload.get("required_columns", [])),
         rules=rules,
         allow_warning_downstream=bool(payload.get("allow_warning_downstream", True)),
+        dedup_strategy=strategy,
     )
 
 

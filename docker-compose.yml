@@ -1,0 +1,78 @@
+# Запуск: cp .env.example .env && docker compose up --build
+x-ekover-env: &ekover-env
+  DATABASE_URL: postgresql+psycopg2://ekover:${POSTGRES_PASSWORD:-ekover}@postgres:5432/ekover
+  DATA_LAKE_PATH: /data
+  ORCHESTRATOR: ${ORCHESTRATOR:-local}
+  ADMIN_API_KEY: ${ADMIN_API_KEY:-}
+  AIRFLOW_API_URL: http://airflow:8080/api/v1
+  AIRFLOW_USERNAME: ${AIRFLOW_USERNAME:-airflow}
+  AIRFLOW_PASSWORD: ${AIRFLOW_PASSWORD:-airflow}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ekover
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ekover}
+      POSTGRES_DB: ekover
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/init-airflow-db.sql:/docker-entrypoint-initdb.d/init-airflow-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ekover -d ekover"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.api
+    environment: *ekover-env
+    volumes:
+      - lake:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  airflow:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.airflow
+    command: standalone
+    environment:
+      <<: *ekover-env
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/ekover/airflow/dags
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://ekover:${POSTGRES_PASSWORD:-ekover}@postgres:5432/airflow
+      AIRFLOW__API__AUTH_BACKENDS: airflow.api.auth.backend.basic_auth
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_USERNAME:-airflow}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_PASSWORD:-airflow}
+    volumes:
+      - .:/opt/ekover
+      - lake:/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    depends_on:
+      - api
+    ports:
+      - "5173:80"
+
+volumes:
+  pgdata:
+  lake:
