@@ -6,52 +6,14 @@ import {
   Activity,
   FileChartColumn,
   Droplets,
-  BrainCircuit,
-  AlertTriangle,
-  History,
 } from "lucide-react";
 
 const menuItems = [
-  {
-    id: "dashboard",
-    label: "Главная",
-    icon: LayoutDashboard,
-  },
-  {
-    id: "upload",
-    label: "Загрузка данных",
-    icon: Upload,
-  },
-  {
-    id: "datasets",
-    label: "Хранилище данных",
-    icon: Database,
-  },
-  {
-    id: "processing",
-    label: "Обработка данных",
-    icon: Activity,
-  },
-  {
-    id: "analytics",
-    label: "Анализ данных",
-    icon: FileChartColumn,
-  },
-  {
-    id: "ml",
-    label: "Машинное обучение",
-    icon: BrainCircuit,
-  },
-  {
-    id: "anomalies",
-    label: "Обнаруженные аномалии",
-    icon: AlertTriangle,
-  },
-  {
-    id: "history",
-    label: "История запусков",
-    icon: History,
-  },
+  { id: "dashboard", label: "Главная", icon: LayoutDashboard },
+  { id: "upload", label: "Загрузка данных", icon: Upload },
+  { id: "datasets", label: "Хранилище данных", icon: Database },
+  { id: "processing", label: "Обработка данных", icon: Activity },
+  { id: "analytics", label: "Анализ данных", icon: FileChartColumn },
 ];
 
 export default function Sidebar({ activePage, onNavigate }) {
@@ -83,7 +45,6 @@ export default function Sidebar({ activePage, onNavigate }) {
                   : "nav-item"
               }
               onClick={() => onNavigate(item.id)}
-              type="button"
             >
               <Icon size={19} />
               <span>{item.label}</span>
@@ -94,7 +55,6 @@ export default function Sidebar({ activePage, onNavigate }) {
 
       <div className="sidebar-bottom">
         <div className="connection-indicator"></div>
-
         <div>
           <strong>Система ЭКОВЕР</strong>
           <span>Локальная версия</span>
