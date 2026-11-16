@@ -6,17 +6,3 @@ __pycache__/
 node_modules/
 data/*/
 data/*.db
-
-# Environment files
-.env.*
-!.env.example
-
-# Local databases and backups
-*.db.*
-*.db
-*.db-*
-*.sqlite
-*.sqlite3
-
-# IDE
-.vscode/

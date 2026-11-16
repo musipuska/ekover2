@@ -13,7 +13,7 @@ from backend.app.core.config import settings
 from backend.ml.features import FeatureConfig
 from backend.ml.inference import batch_predict, read_predictions
 from backend.ml.registry import ModelRegistry, RegistryError
-from backend.ml.training import DEFAULT_MODEL_NAME, read_run, runs_dir, save_run, train_model
+from backend.ml.training import DEFAULT_MODEL_NAME, read_run, save_run, train_model
 
 router = APIRouter(prefix="/ml", tags=["ML"])
 logger = logging.getLogger(__name__)
@@ -190,68 +190,6 @@ def create_inference(body: InferenceRequest, background: BackgroundTasks):
     background.add_task(_run_inference, run_id, body)
     return ok({"job_id": run_id, "status": "queued"})
 
-@router.get("/runs")
-def list_runs(
-    kind: str | None = None,
-    status: str | None = None,
-    dataset_id: str | None = None,
-    limit: int = Query(100, ge=1, le=1000),
-    offset: int = Query(0, ge=0),
-):
-    """
-    Возвращает историю запусков обучения и инференса.
-
-    Поддерживает фильтрацию по типу, статусу и набору данных.
-    """
-    directory = runs_dir()
-    records = []
-
-    if directory.exists():
-        for path in directory.glob("*.json"):
-            try:
-                with path.open("r", encoding="utf-8") as file:
-                    record = json.load(file)
-
-                if not isinstance(record, dict):
-                    continue
-
-                if kind and record.get("kind") != kind:
-                    continue
-
-                if status and record.get("status") != status:
-                    continue
-
-                if dataset_id and record.get("dataset_id") != dataset_id:
-                    continue
-
-                records.append(record)
-
-            except (OSError, json.JSONDecodeError) as error:
-                logger.warning(
-                    "Не удалось прочитать ML run %s: %s",
-                    path.name,
-                    error,
-                )
-
-    records.sort(
-        key=lambda item: (
-            item.get("started_at")
-            or item.get("created_at")
-            or item.get("finished_at")
-            or ""
-        ),
-        reverse=True,
-    )
-
-    total = len(records)
-    items = records[offset:offset + limit]
-
-    return ok(
-        items,
-        total=total,
-        limit=limit,
-        offset=offset,
-    )
 
 @router.get("/runs/{run_id}")
 def get_run(run_id: str):
