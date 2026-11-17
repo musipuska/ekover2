@@ -5,6 +5,7 @@ from backend.etl.common.config import RuleSpec
 from backend.etl.common.exceptions import ValidationError
 
 ROW_RULES = {
+    "valid_datetime",
     "not_null",
     "between",
     "allowed_values",
@@ -60,6 +61,15 @@ def row_failure_condition(spec: RuleSpec) -> Column:
         condition = column.isNotNull() & F.to_timestamp(column.cast("string")).isNull()
     elif spec.rule == "not_in_future":
         condition = F.to_timestamp(column.cast("string")) > F.current_timestamp()
+    elif spec.rule == "valid_datetime":
+        source_columns = spec.columns or []
+
+        source_present = F.lit(False)
+
+        for name in source_columns:
+            source_present = source_present | _col(name).isNotNull()
+
+        condition = column.isNull() & source_present
     else:
         raise ValidationError(f"Правило {spec.rule} не является построчным")
 
@@ -129,6 +139,18 @@ def evaluate_rules(
             if spec.column not in available:
                 results[spec.name] = _unavailable(spec, f"Столбец {spec.column} отсутствует")
                 continue
+            if spec.rule == "valid_datetime":
+                missing = [
+                    name for name in (spec.columns or [])
+                    if name not in available
+                ]
+
+                if missing:
+                    results[spec.name] = _unavailable(
+                        spec,
+                        f"Отсутствуют исходные столбцы даты и времени: {missing}",
+                    )
+                    continue
             condition = row_failure_condition(spec)
             aggregations.append(
                 F.sum(F.when(condition, 1).otherwise(0)).alias(f"r::{spec.name}")

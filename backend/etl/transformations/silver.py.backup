@@ -1,0 +1,221 @@
+
+import re
+
+from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
+from pyspark.sql.types import StringType
+from pyspark.sql.window import Window
+
+from backend.etl.transformations.bronze import TECHNICAL_COLUMNS
+
+TECHNICAL_SET = set(TECHNICAL_COLUMNS)
+
+
+def normalize_column_name(name: str) -> str:
+    name = name.strip().lower()
+    name = re.sub(r"[^a-zа-яё0-9]+", "_", name)
+    name = name.strip("_")
+    return name or "column"
+
+
+def normalize_columns(df: DataFrame) -> DataFrame:
+    used: set[str] = set()
+    expressions = []
+
+    for old_name in df.columns:
+        if old_name in TECHNICAL_SET:
+            new_name = old_name
+        else:
+            base = normalize_column_name(old_name)
+            new_name = base
+            counter = 2
+
+            while new_name in used or new_name in TECHNICAL_SET:
+                new_name = f"{base}_{counter}"
+                counter += 1
+
+        used.add(new_name)
+        expressions.append(F.col(f"`{old_name}`").alias(new_name))
+
+    return df.select(*expressions)
+
+
+def business_columns(df: DataFrame) -> list[str]:
+    return [name for name in df.columns if name not in TECHNICAL_SET]
+
+
+def standardize_strings(df: DataFrame) -> DataFrame:
+    for field in df.schema.fields:
+        if field.name in TECHNICAL_SET or not isinstance(field.dataType, StringType):
+            continue
+
+        column = F.col(f"`{field.name}`")
+
+        df = df.withColumn(
+            field.name,
+            F.when(F.trim(column) == "", None).otherwise(F.trim(column)),
+        )
+
+    return df
+
+
+def build_measured_at(df: DataFrame) -> DataFrame:
+    """
+    Объединяет date и time в measured_at.
+    Исходные столбцы date и time сохраняются.
+    """
+
+    if "date" not in df.columns or "time" not in df.columns:
+        return df
+
+    date_value = F.trim(F.col("date").cast("string"))
+    time_value = F.trim(F.col("time").cast("string"))
+
+    datetime_value = F.concat_ws(" ", date_value, time_value)
+
+    formats = [
+        "yyyy-MM-dd HH:mm:ss",
+        "yyyy-MM-dd H:mm:ss",
+        "yyyy-MM-dd HH:mm",
+        "yyyy-MM-dd H:mm",
+        "MM-dd-yy HH:mm:ss",
+        "MM-dd-yy H:mm:ss",
+        "MM-dd-yy HH:mm",
+        "MM-dd-yy H:mm",
+    ]
+
+    parsed_values = [
+        F.try_to_timestamp(datetime_value, F.lit(fmt))
+        for fmt in formats
+    ]
+
+    return df.withColumn(
+        "measured_at",
+        F.coalesce(*parsed_values),
+    )
+
+
+def standardize_timestamps(
+    df: DataFrame,
+    columns: list[str],
+) -> DataFrame:
+    for name in columns:
+        if name in df.columns:
+            df = df.withColumn(
+                name,
+                F.try_to_timestamp(F.col(f"`{name}`").cast("string")),
+            )
+
+    return df
+
+
+def resolve_strategy(
+    strategy: str,
+    business_key: list[str] | None,
+) -> str:
+    if strategy == "auto":
+        return "business_key" if business_key else "full_row"
+
+    if strategy == "business_key" and not business_key:
+        raise ValueError(
+            "dedup_strategy=business_key требует business_key"
+        )
+
+    return strategy
+
+
+def deduplicate(
+    df: DataFrame,
+    business_key: list[str] | None = None,
+    strategy: str = "auto",
+) -> DataFrame:
+
+    strategy = resolve_strategy(strategy, business_key)
+
+    if strategy == "none":
+        return df
+
+    if strategy == "record_hash" and "_record_hash" in df.columns:
+        return df.dropDuplicates(["_record_hash"])
+
+    key = [
+        name
+        for name in (business_key or [])
+        if name in df.columns
+    ]
+
+    if strategy == "business_key" and key:
+        order = (
+            F.col("_source_row_number").desc()
+            if "_source_row_number" in df.columns
+            else F.col(key[0])
+        )
+
+        window = (
+            Window
+            .partitionBy(*[F.col(f"`{name}`") for name in key])
+            .orderBy(order)
+        )
+
+        return (
+            df.withColumn("_rn", F.row_number().over(window))
+            .filter(F.col("_rn") == 1)
+            .drop("_rn")
+        )
+
+    subset = business_columns(df)
+
+    return df.dropDuplicates(subset) if subset else df.dropDuplicates()
+
+
+def clean_silver_frame(
+    df: DataFrame,
+    business_key: list[str] | None = None,
+    timestamp_columns: list[str] | None = None,
+    dedup_strategy: str = "auto",
+) -> tuple[DataFrame, int]:
+
+    df = normalize_columns(df)
+    df = standardize_strings(df)
+
+    # Сначала объединяем исходные дату и время.
+    df = build_measured_at(df)
+
+    # Затем обрабатываем остальные временные столбцы из конфигурации.
+    df = standardize_timestamps(
+        df,
+        timestamp_columns or [],
+    )
+
+    rows_before = df.count()
+
+    df = deduplicate(
+        df,
+        business_key,
+        dedup_strategy,
+    )
+
+    return df, rows_before
+
+
+def clean_silver_layer(
+    df: DataFrame,
+    business_key: list[str] | None = None,
+    timestamp_columns: list[str] | None = None,
+) -> tuple[DataFrame, int]:
+
+    cleaned, rows_before = clean_silver_frame(
+        df,
+        business_key,
+        timestamp_columns,
+    )
+
+    return cleaned, rows_before - cleaned.count()
+
+
+def save_silver_layer(
+    df: DataFrame,
+    output_path: str,
+) -> None:
+
+    df.write.mode("errorifexists").parquet(output_path)

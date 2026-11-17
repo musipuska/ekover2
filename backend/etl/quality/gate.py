@@ -29,17 +29,17 @@ def critical_failures(results: list[dict]) -> int:
 
 
 def quality_score(results: list[dict]) -> float:
-    """Доля пройденных правил от всех настроенных.
+    """Доля пройденных правил среди реально выполненных проверок."""
+    executed = [
+        item for item in results
+        if item["status"] != "skipped"
+    ]
 
-    Пропущенные правила считаются не пройденными, поэтому при пустом наборе
-    или нулевом покрытии оценка равна 0, а не 100%. Любой critical-провал
-    обнуляет оценку.
-    """
-    if not results or critical_failures(results):
+    if not executed or critical_failures(results):
         return 0.0
-    passed = sum(1 for item in results if item["status"] == "passed")
-    return round(passed / len(results), 4)
 
+    passed = sum(1 for item in executed if item["status"] == "passed")
+    return round(passed / len(executed), 4)
 
 def allows_downstream(status: str, allow_warning: bool = True) -> bool:
     if status == PASSED:

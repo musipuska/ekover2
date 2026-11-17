@@ -32,4 +32,8 @@ def task_build_marts(conf: dict) -> dict:
 @track_stage("analytics")
 def task_validate_marts(conf: dict) -> dict:
     dataset_id, batch_id = _required(conf)
-    return validate_marts(dataset_id, batch_id)
+    return validate_marts(
+        dataset_id,
+        batch_id,
+        mapping=_mapping(conf),
+    )

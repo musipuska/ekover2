@@ -1,4 +1,17 @@
 
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  Cell,
+  PieChart,
+  Pie,
+} from "recharts";
 import React, { useEffect, useState } from "react";
 import {
   LayoutDashboard,
@@ -32,6 +45,7 @@ const pageTitles = {
   processing: "Обработка данных",
   analytics: "Анализ данных",
   ml: "Машинное обучение",
+  "ml-insights": "Выводы ML-анализа",
   anomalies: "Обнаруженные аномалии",
   history: "История запусков",
 };
@@ -107,6 +121,12 @@ export default function App() {
   const [quality, setQuality] = useState(null);
   const [qualityError, setQualityError] = useState("");
 
+    // Аналитический дашборд
+  const [analyticsOverview, setAnalyticsOverview] = useState(null);
+  const [analyticsParameters, setAnalyticsParameters] = useState([]);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState("");
+
   const [search, setSearch] = useState("");
 
   // Машинное обучение
@@ -122,6 +142,10 @@ export default function App() {
   // Аномалии и предсказания
   const [anomalies, setAnomalies] = useState([]);
   const [predictions, setPredictions] = useState([]);
+    // Выводы ML-анализа
+  const [mlAnalytics, setMlAnalytics] = useState(null);
+  const [mlAnalyticsLoading, setMlAnalyticsLoading] = useState(false);
+  const [mlAnalyticsError, setMlAnalyticsError] = useState("");
 
   // История
   const [history, setHistory] = useState([]);
@@ -142,6 +166,35 @@ export default function App() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadAnalytics(datasetId) {
+    if (!datasetId) {
+      setAnalyticsOverview(null);
+      setAnalyticsParameters([]);
+      return;
+    }
+
+    setAnalyticsLoading(true);
+    setAnalyticsError("");
+
+    try {
+      const [overviewResult, parametersResult] = await Promise.all([
+        api.getAnalyticsOverview(),
+        api.getParameterMetrics(datasetId),
+      ]);
+
+      setAnalyticsOverview(overviewResult);
+      setAnalyticsParameters(
+        Array.isArray(parametersResult) ? parametersResult : []
+      );
+    } catch (err) {
+      setAnalyticsError(err.message);
+      setAnalyticsOverview(null);
+      setAnalyticsParameters([]);
+    } finally {
+      setAnalyticsLoading(false);
     }
   }
 
@@ -313,6 +366,32 @@ export default function App() {
       setAnomalies(getItems(result));
     } catch (err) {
       setError(`Не удалось загрузить аномалии: ${err.message}`);
+    }
+  }
+
+  async function loadMLAnalytics() {
+    if (!selectedDataset || !batchId) {
+      setMlAnalytics(null);
+      return;
+    }
+
+    setMlAnalyticsLoading(true);
+    setMlAnalyticsError("");
+
+    try {
+      const result = await api.getMLAnalytics({
+        dataset_id: selectedDataset,
+        batch_id: batchId,
+        model_name: modelName,
+      });
+
+      setMlAnalytics(result);
+    } catch (err) {
+      setMlAnalyticsError(
+        `Не удалось загрузить выводы ML-анализа: ${err.message}`
+      );
+    } finally {
+      setMlAnalyticsLoading(false);
     }
   }
 
@@ -510,6 +589,9 @@ export default function App() {
       loadAnomalies();
       loadPredictions();
     }
+    if (activePage === "ml-insights") {
+      loadMLAnalytics();
+}
   }, [activePage]);
 
   // -----------------------------
@@ -555,6 +637,9 @@ export default function App() {
           icon={FileSpreadsheet}
         />
       </div>
+
+
+
 
       <section className="content-card">
         <div className="section-heading">
@@ -764,6 +849,18 @@ export default function App() {
   // Аналитика
   // -----------------------------
 
+  const formatProfileValue = (value) => {
+    if (value === null || value === undefined || value === "") {
+      return "—";
+    }
+
+    const number = Number(value);
+
+    return Number.isFinite(number)
+      ? number.toFixed(2)
+      : value;
+  };
+
   const renderAnalytics = () => (
     <section className="content-card">
       <div className="section-heading">
@@ -784,13 +881,17 @@ export default function App() {
         value={selectedDataset}
         onChange={(event) => {
           if (event.target.value) {
-            loadProfile(event.target.value);
+              loadProfile(event.target.value);
+              loadAnalytics(event.target.value);
           } else {
             setProfile(null);
             setQuality(null);
             setQualityError("");
             setSelectedDataset("");
             setBatchId("");
+            setAnalyticsOverview(null);
+            setAnalyticsParameters([]);
+            setAnalyticsError("");
           }
         }}
       >
@@ -802,6 +903,81 @@ export default function App() {
           </option>
         ))}
       </select>
+            {analyticsLoading && (
+        <div className="notice">
+          <p>Загрузка аналитики...</p>
+        </div>
+      )}
+
+      {analyticsError && (
+        <div className="notice">
+          <AlertCircle size={20} />
+          <p>{analyticsError}</p>
+        </div>
+      )}
+
+      {analyticsOverview && (
+        <>
+          <h4>Общая статистика</h4>
+
+          <div className="stats-grid">
+            <StatCard
+              title="Наборов данных"
+              value={analyticsOverview.datasets ?? 0}
+              description="Обработанные наборы"
+              icon={Database}
+            />
+
+            <StatCard
+              title="Пакетов обработки"
+              value={analyticsOverview.batches ?? 0}
+              description="Всего запусков"
+              icon={RefreshCw}
+            />
+
+            <StatCard
+              title="Всего записей"
+              value={analyticsOverview.rows ?? 0}
+              description="В последних версиях наборов"
+              icon={FileSpreadsheet}
+            />
+          </div>
+        </>
+      )}
+
+      {analyticsParameters.length > 0 && (
+        <>
+          <h4>Средние значения параметров</h4>
+
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={analyticsParameters}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#31505a"
+                />
+                <XAxis
+                  dataKey="parameter"
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                  height={90}
+                  tick={{ fill: "#cbd5e1", fontSize: 11 }}
+                />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar
+                  dataKey="mean"
+                  name="Среднее значение"
+                  fill="#14b8a6"
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </>
+      )}
 
       {profile && (
         <div className="profile-result">
@@ -848,17 +1024,72 @@ export default function App() {
                       {column.null_percent?.toFixed(2) ?? "—"}%
                     </td>
                     <td>{column.unique_count}</td>
-                    <td>{column.min_value ?? "—"}</td>
-                    <td>{column.max_value ?? "—"}</td>
-                    <td>
-                      {column.average_value == null
-                        ? "—"
-                        : Number(column.average_value).toFixed(2)}
-                    </td>
+                    <td>{formatProfileValue(column.min_value)}</td>
+                    <td>{formatProfileValue(column.max_value)}</td>
+                    <td>{formatProfileValue(column.average_value)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+
+                  <h4>Пропуски по столбцам, %</h4>
+
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={350}>
+              <BarChart data={profile.columns || []}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#31505a"
+                />
+                <XAxis
+                  dataKey="name"
+                  angle={-35}
+                  textAnchor="end"
+                  interval={0}
+                  height={90}
+                  tick={{ fill: "#cbd5e1", fontSize: 11 }}
+                />
+                <YAxis domain={[0, 100]} />
+                <Tooltip />
+                <Bar
+                  dataKey="null_percent"
+                  name="Пропуски, %"
+                  fill="#f59e0b"
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          <h4>Уникальные значения по столбцам</h4>
+
+          <div className="chart-container">
+            <ResponsiveContainer width="100%" height={420}>
+              <BarChart data={profile.columns || []}>
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  stroke="#31505a"
+                />
+                <XAxis
+                  dataKey="name"
+                  angle={-45}
+                  textAnchor="end"
+                  interval={0}
+                  height={120}
+                  tick={{ fill: "#cbd5e1", fontSize: 9 }}
+                  tickMargin={10}
+                />
+                <YAxis />
+                <Tooltip />
+                <Bar
+                  dataKey="unique_count"
+                  name="Уникальные значения"
+                  fill="#818cf8"
+                  radius={[6, 6, 0, 0]}
+                />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
           <h4>Отчёт качества данных</h4>
@@ -1333,6 +1564,404 @@ export default function App() {
     </>
   );
 
+
+
+  const renderMLInsights = () => {
+    const data = mlAnalytics;
+
+    const featureNames = {
+      ph: "Водородный показатель (pH)",
+      hardness: "Жёсткость",
+      solids: "Растворённые вещества",
+      chloramines: "Хлорамины",
+      sulfate: "Сульфаты",
+      conductivity: "Электропроводность",
+      organic_carbon: "Органический углерод",
+      trihalomethanes: "Тригалометаны",
+      turbidity: "Мутность",
+    };
+
+    const chartData = data
+      ? [
+          { name: "Обычные записи", value: Number(data.normal_count) || 0 },
+          { name: "Аномалии", value: Number(data.anomaly_count) || 0 },
+        ]
+      : [];
+
+    const features = data?.features || [];
+
+    return (
+      <>
+        <section className="content-card">
+          <div className="section-heading">
+            <div>
+              <h3>Выводы ML-анализа</h3>
+              <p>Сводные результаты работы модели обнаружения аномалий.</p>
+            </div>
+            <BrainCircuit size={26} />
+          </div>
+
+          <label className="field-label">Набор данных</label>
+          <select
+            className="text-input"
+            value={selectedDataset}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSelectedDataset(value);
+              setBatchId("");
+              setMlAnalytics(null);
+
+              if (value) {
+                loadProfile(value);
+              }
+            }}
+          >
+            <option value="">Выбрать набор данных</option>
+            {datasets.map((dataset) => (
+              <option key={dataset.id} value={dataset.id}>
+                {dataset.name || dataset.id}
+              </option>
+            ))}
+          </select>
+
+          <label className="field-label">Batch ID</label>
+          <input
+            className="text-input"
+            value={batchId}
+            onChange={(event) => setBatchId(event.target.value)}
+            placeholder="Batch ID"
+          />
+
+          <button
+            className="primary-button"
+            onClick={loadMLAnalytics}
+            disabled={mlAnalyticsLoading || !selectedDataset || !batchId}
+          >
+            <Search size={18} />
+            Загрузить аналитику
+          </button>
+        </section>
+
+        {mlAnalyticsLoading && (
+          <section className="content-card">
+            <p>Загружаем результаты ML-анализа...</p>
+          </section>
+        )}
+
+        {mlAnalyticsError && (
+          <section className="content-card">
+            <p>{mlAnalyticsError}</p>
+          </section>
+        )}
+
+        {data && !mlAnalyticsLoading && (
+          <>
+            {/* Основные показатели */}
+            <section className="content-card">
+              <div className="section-heading">
+                <div>
+                  <h3>Основные показатели</h3>
+                  <p>
+                    Модель: {data.model_name}, версия: {data.model_version}
+                  </p>
+                </div>
+                <BarChart3 size={25} />
+              </div>
+
+              <div className="stats-grid">
+                <StatCard
+                  title="Проверено записей"
+                  value={data.rows_scored}
+                  description="Всего обработано моделью"
+                  icon={Database}
+                />
+
+                <StatCard
+                  title="Обнаружено аномалий"
+                  value={data.anomaly_count}
+                  description="Записи с отклонениями"
+                  icon={AlertTriangle}
+                />
+
+                <StatCard
+                  title="Обычные записи"
+                  value={data.normal_count}
+                  description="Без отметки об аномалии"
+                  icon={CheckCircle2}
+                />
+
+                <StatCard
+                  title="Доля аномалий"
+                  value={`${((Number(data.anomaly_rate) || 0) * 100).toFixed(2)}%`}
+                  description="От общего количества записей"
+                  icon={Activity}
+                />
+              </div>
+            </section>
+
+            {/* График 1. Соотношение обычных записей и аномалий */}
+            <section className="content-card">
+              <div className="section-heading">
+                <div>
+                  <h3>Соотношение результатов</h3>
+                  <p>Распределение обычных записей и аномалий.</p>
+                </div>
+                <BarChart3 size={25} />
+              </div>
+
+              <div style={{ width: "100%", height: 300 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="value" name="Количество записей">
+                      <Cell fill="#22a06b" />
+                      <Cell fill="#e05252" />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+
+            {/* График 2. Частота отклонений по параметрам */}
+                  <section className="content-card">
+                    <div className="section-heading">
+                      <div>
+                        <h3>Последние наборы данных</h3>
+                  <p>
+                    Количество упоминаний каждого параметра среди обнаруженных
+                    аномалий.
+                  </p>
+                </div>
+                <BarChart3 size={25} />
+              </div>
+
+              {features.length > 0 ? (
+                <div style={{ width: "100%", height: 350 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={features.map((item) => ({
+                        ...item,
+                        name: featureNames[item.parameter] || item.parameter,
+                      }))}
+                      layout="vertical"
+                      margin={{ left: 25, right: 30 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={165}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip />
+                      <Bar
+                        dataKey="mentions"
+                        name="Количество упоминаний"
+                        fill="#3986c9"
+                        radius={[0, 5, 5, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>Нет данных для построения графика</strong>
+                </div>
+              )}
+            </section>
+
+            {/* График 3. Среднее отклонение по параметрам */}
+            <section className="content-card">
+              <div className="section-heading">
+                <div>
+                  <h3>Среднее отклонение по параметрам</h3>
+                  <p>
+                    Средняя величина статистического отклонения каждого показателя.
+                  </p>
+                </div>
+                <BarChart3 size={25} />
+              </div>
+
+              {features.length > 0 ? (
+                <div style={{ width: "100%", height: 350 }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={features.map((item) => ({
+                        ...item,
+                        name: featureNames[item.parameter] || item.parameter,
+                        deviation: Number(
+                          item.avg_abs_deviation ?? item.average_deviation
+                        ) || 0,
+                      }))}
+                      layout="vertical"
+                      margin={{ left: 25, right: 30 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" />
+                      <YAxis
+                        dataKey="name"
+                        type="category"
+                        width={165}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip />
+                      <Bar
+                        dataKey="deviation"
+                        name="Среднее отклонение (σ)"
+                        fill="#8b6ccf"
+                        radius={[0, 5, 5, 0]}
+                      />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>Нет данных для построения графика</strong>
+                </div>
+              )}
+            </section>
+
+            {/* График 4. Круговая диаграмма */}
+            <section className="content-card">
+              <div className="section-heading">
+                <div>
+                  <h3>Доля нормальных записей и аномалий</h3>
+                  <p>Процентное соотношение результатов работы модели.</p>
+                </div>
+                <PieChart size={25} />
+              </div>
+
+              <div style={{ width: "100%", height: 320 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={105}
+                      label
+                    >
+                      <Cell fill="#36a879" />
+                      <Cell fill="#e45b5b" />
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+
+            {/* Таблица параметров */}
+            <section className="content-card">
+              <div className="section-heading">
+                <div>
+                  <h3>Параметры, связанные с аномалиями</h3>
+                  <p>
+                    Частота появления параметров среди трёх наиболее выраженных
+                    отклонений в каждой аномальной записи.
+                  </p>
+                </div>
+                <Activity size={25} />
+              </div>
+
+              {features.length > 0 ? (
+                <div className="table-wrapper">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Параметр</th>
+                        <th>Количество упоминаний</th>
+                        <th>Среднее отклонение (σ)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {features.map((item) => (
+                        <tr key={item.parameter}>
+                          <td>
+                            {featureNames[item.parameter] || item.parameter}
+                          </td>
+                          <td>{item.mentions}</td>
+                          <td>
+                            {Number(
+                              item.avg_abs_deviation ?? item.average_deviation
+                            ).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="empty-state">
+                  <strong>Нет данных о параметрах</strong>
+                  <span>Для выбранного набора не найдены аномалии.</span>
+                </div>
+              )}
+            </section>
+
+            {/* Автоматическое заключение */}
+            <section className="content-card">
+              <div className="section-heading">
+                <div>
+                  <h3>Автоматическое заключение</h3>
+                  <p>Интерпретация результатов модели.</p>
+                </div>
+                <FileChartColumn size={25} />
+              </div>
+
+              {data.rows_scored > 0 ? (
+                <div className="empty-state">
+                  <strong>
+                    {data.anomaly_count > 0
+                      ? "В наборе обнаружены отклонения"
+                      : "Аномалии не обнаружены"}
+                  </strong>
+                  <span>
+                    Модель обработала {data.rows_scored} записей.
+                    Отмечено {data.anomaly_count} аномалий (
+                    {((Number(data.anomaly_rate) || 0) * 100).toFixed(2)}%).
+                    {features.length > 0
+                      ? ` Чаще всего среди выраженных отклонений встречался параметр: ${
+                          featureNames[features[0].parameter] ||
+                          features[0].parameter
+                        }.`
+                      : ""}
+                    {" "}Результат является статистической оценкой модели
+                    и сам по себе не подтверждает безопасность или опасность воды.
+                  </span>
+                </div>
+              ) : (
+                <p>Для выбранного набора пока нет обработанных записей.</p>
+              )}
+            </section>
+          </>
+        )}
+
+        {!data && !mlAnalyticsLoading && !mlAnalyticsError && (
+          <section className="content-card">
+            <div className="empty-state">
+              <BrainCircuit size={34} />
+              <strong>Аналитика пока не загружена</strong>
+              <span>
+                Выбери набор данных и укажи Batch ID, чтобы посмотреть
+                результаты модели.
+              </span>
+            </div>
+          </section>
+        )}
+      </>
+    );
+  };
+
+
+
   // -----------------------------
   // История запусков
   // -----------------------------
@@ -1466,6 +2095,7 @@ export default function App() {
           {activePage === "processing" && renderProcessing()}
           {activePage === "analytics" && renderAnalytics()}
           {activePage === "ml" && renderML()}
+          {activePage === "ml-insights" && renderMLInsights()}
           {activePage === "anomalies" && renderAnomalies()}
           {activePage === "history" && renderHistory()}
         </div>

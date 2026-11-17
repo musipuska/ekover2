@@ -1,3 +1,8 @@
+from backend.analytics.tasks import (
+    task_check_gold,
+    task_build_marts,
+    task_validate_marts,
+)
 import argparse
 import logging
 
@@ -59,6 +64,37 @@ def run_pipeline(
             rows_silver=silver["row_count"],
             rows_gold=gold["row_count"],
         )
+
+        analytics_conf = {
+            "dataset_id": dataset_id,
+            "batch_id": batch_id,
+            "mapping": {
+                "timestamp_column": None,
+                "station_column": None,
+                "detect_station_column": False,
+                "parameter_columns": None,
+            },
+        }
+
+        try:
+            task_check_gold(analytics_conf)
+
+            marts_result = task_build_marts(analytics_conf)
+
+            validation_result = task_validate_marts(analytics_conf)
+
+            metrics["analytics_status"] = "success"
+            metrics["analytics_marts"] = marts_result
+            metrics["analytics_validation"] = validation_result
+
+        except Exception as error:
+            metrics["analytics_status"] = "failed"
+            metrics["analytics_error"] = str(error)
+
+            logger.exception(
+                "Analytics stage failed for batch %s",
+                batch_id,
+            )
         mark_job_finished(job_id, "success", None, quality_status, metrics)
         set_dataset_status(dataset_id, "success")
         log_event(logger, "Pipeline finished", ctx, metrics=metrics)

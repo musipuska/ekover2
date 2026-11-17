@@ -122,6 +122,117 @@ def list_anomalies(
     return ok(_records(frame, limit, offset), total=int(len(frame)), limit=limit, offset=offset)
 
 
+@router.get("/analytics")
+def get_ml_analytics(
+    dataset_id: str,
+    batch_id: str,
+    model_name: str = DEFAULT_MODEL_NAME,
+    model_version: str | None = None,
+):
+    """
+    Возвращает сводную аналитику ML по всему набору предсказаний.
+    """
+    from collections import defaultdict
+
+    frame = read_predictions(
+        model_name=model_name,
+        dataset_id=dataset_id,
+        batch_id=batch_id,
+    )
+
+    if frame.empty:
+        return ok({
+            "dataset_id": dataset_id,
+            "batch_id": batch_id,
+            "model_name": model_name,
+            "model_version": model_version,
+            "rows_scored": 0,
+            "anomaly_count": 0,
+            "normal_count": 0,
+            "anomaly_rate": 0,
+            "features": [],
+        })
+
+    # Если версия не указана, выбираем последнюю по времени инференса.
+    if model_version:
+        frame = frame[frame["model_version"] == model_version]
+    else:
+        latest_version = (
+            frame.sort_values("created_at", ascending=False)
+            .iloc[0]["model_version"]
+        )
+        frame = frame[frame["model_version"] == latest_version]
+        model_version = latest_version
+
+    if frame.empty:
+        raise ApiError(
+            "PREDICTIONS_NOT_FOUND",
+            "Для выбранной версии модели предсказания не найдены",
+            404,
+        )
+
+    rows_scored = len(frame)
+    anomaly_count = int(frame["is_anomaly"].astype(bool).sum())
+    normal_count = rows_scored - anomaly_count
+
+    feature_stats = defaultdict(lambda: {
+        "mentions": 0,
+        "deviation_sum": 0.0,
+    })
+
+    anomalies_frame = frame[frame["is_anomaly"].astype(bool)]
+
+    for context in anomalies_frame["context"]:
+        if isinstance(context, str):
+            try:
+                context = json.loads(context)
+            except json.JSONDecodeError:
+                continue
+
+        if not isinstance(context, dict):
+            continue
+
+        for item in context.get("top_features", []):
+            feature = item.get("feature")
+            deviation = item.get("deviation_sigma")
+
+            if not feature or deviation is None:
+                continue
+
+            stats = feature_stats[feature]
+            stats["mentions"] += 1
+            stats["deviation_sum"] += abs(float(deviation))
+
+    features = []
+
+    for name, stats in feature_stats.items():
+        mentions = stats["mentions"]
+
+        features.append({
+            "parameter": name,
+            "mentions": mentions,
+            "average_deviation": round(
+                stats["deviation_sum"] / mentions, 2
+            ),
+        })
+
+    features.sort(
+        key=lambda item: item["mentions"],
+        reverse=True,
+    )
+
+    return ok({
+        "dataset_id": dataset_id,
+        "batch_id": batch_id,
+        "model_name": model_name,
+        "model_version": model_version,
+        "rows_scored": rows_scored,
+        "anomaly_count": anomaly_count,
+        "normal_count": normal_count,
+        "anomaly_rate": anomaly_count / rows_scored,
+        "features": features,
+    })
+
 @router.get("/anomalies/{prediction_id}")
 def get_anomaly(prediction_id: str):
     frame = read_predictions(only_anomalies=False)

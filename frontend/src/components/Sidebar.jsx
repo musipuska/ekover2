@@ -43,6 +43,11 @@ const menuItems = [
     icon: BrainCircuit,
   },
   {
+    id: "ml-insights",
+    label: "Выводы ML-анализа",
+    icon: BrainCircuit,
+  },
+  {
     id: "anomalies",
     label: "Обнаруженные аномалии",
     icon: AlertTriangle,

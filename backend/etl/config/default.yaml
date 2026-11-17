@@ -50,6 +50,14 @@ rules:
     threshold: 0.5
     severity: warning
 
+  - name: measured_at_valid
+    column: measured_at
+    columns:
+      - date
+      - time
+    rule: valid_datetime
+    severity: warning
+
   - name: measured_at_not_in_future
     column: measured_at
     rule: not_in_future

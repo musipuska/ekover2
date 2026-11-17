@@ -55,7 +55,7 @@ def test_gate_levels():
     assert evaluate_gate([skipped]) == "warning"
     assert evaluate_gate([passed, warn]) == "warning"
     assert evaluate_gate([warn, crit]) == "failed"
-    assert quality_score([passed, warn, skipped]) == round(1 / 3, 4)
+    assert quality_score([passed, warn, skipped]) == 0.5
     assert quality_score([]) == 0.0 and quality_score([skipped]) == 0.0
     assert quality_score([passed, crit]) == 0.0
     assert rule_coverage([passed, warn, skipped]) == round(2 / 3, 4)

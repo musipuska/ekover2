@@ -1,8 +1,9 @@
 import re
 
 from pyspark.sql import DataFrame
+from pyspark.sql import functions as F
 from pyspark.sql.functions import col, row_number, to_timestamp, trim, when
-from pyspark.sql.types import StringType
+from pyspark.sql.types import StringType, TimestampType
 from pyspark.sql.window import Window
 
 from backend.etl.transformations.bronze import TECHNICAL_COLUMNS
@@ -52,6 +53,56 @@ def standardize_strings(df: DataFrame) -> DataFrame:
         )
     return df
 
+def build_measured_at(df: DataFrame) -> DataFrame:
+    if "date" not in df.columns or "time" not in df.columns:
+        return df
+
+    date_value = F.trim(F.col("date").cast("string"))
+
+    # Распознаём дату в нескольких форматах
+    parsed_date = F.coalesce(
+        F.try_to_timestamp(date_value, F.lit("MM-dd-yy")),
+        F.try_to_timestamp(date_value, F.lit("yyyy-MM-dd")),
+        F.try_to_timestamp(date_value, F.lit("dd/MM/yyyy")),
+    )
+
+    # Если Spark уже преобразовал время в timestamp,
+    # извлекаем только часы, минуты и секунды
+    if isinstance(df.schema["time"].dataType, TimestampType):
+        time_value = F.date_format(F.col("time"), "HH:mm:ss")
+    else:
+        raw_time = F.trim(F.col("time").cast("string"))
+        time_datetime = F.concat(F.lit("1970-01-01 "), raw_time)
+
+        parsed_time = F.coalesce(
+            F.try_to_timestamp(time_datetime, F.lit("yyyy-MM-dd H:mm:ss")),
+            F.try_to_timestamp(time_datetime, F.lit("yyyy-MM-dd HH:mm:ss")),
+            F.try_to_timestamp(time_datetime, F.lit("yyyy-MM-dd H:mm")),
+            F.try_to_timestamp(time_datetime, F.lit("yyyy-MM-dd HH:mm")),
+        )
+
+        time_value = F.date_format(parsed_time, "HH:mm:ss")
+
+    # Формируем полноценную дату и время
+    datetime_value = F.concat(
+        F.date_format(parsed_date, "yyyy-MM-dd"),
+        F.lit(" "),
+        time_value,
+    )
+
+    measured_at = F.when(
+        parsed_date.isNotNull() & time_value.isNotNull(),
+        F.try_to_timestamp(
+            datetime_value,
+            F.lit("yyyy-MM-dd HH:mm:ss"),
+        ),
+    )
+
+    return (
+        df
+        .withColumn("time", time_value)
+        .withColumn("measured_at", measured_at)
+    )
 
 def standardize_timestamps(df: DataFrame, columns: list[str]) -> DataFrame:
     for name in columns:
@@ -99,6 +150,7 @@ def clean_silver_frame(
 ) -> tuple[DataFrame, int]:
     df = normalize_columns(df)
     df = standardize_strings(df)
+    df = build_measured_at(df)
     df = standardize_timestamps(df, timestamp_columns or [])
     rows_before = df.count()
     df = deduplicate(df, business_key, dedup_strategy)

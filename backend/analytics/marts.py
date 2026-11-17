@@ -20,6 +20,7 @@ class AnalyticsMapping:
     timestamp_column: str | None = None
     station_column: str | None = None
     parameter_columns: list[str] | None = None
+    detect_station_column: bool = True
 
 
 def analytics_root(data_root: str | None = None) -> Path:
@@ -35,36 +36,85 @@ def mart_dir(mart: str, dataset_id: str, batch_id: str, data_root: str | None = 
     )
 
 
-def detect_mapping(df: pd.DataFrame, mapping: AnalyticsMapping | None = None) -> AnalyticsMapping:
+
+def detect_mapping(
+    df: pd.DataFrame,
+    mapping: AnalyticsMapping | None = None,
+) -> AnalyticsMapping:
     mapping = mapping or AnalyticsMapping()
+
+    # Определяем колонку с датой, если она есть
     timestamp = mapping.timestamp_column
+
     if timestamp is None:
         for name in ("measured_at", "timestamp", "datetime", "date"):
             if name in df.columns:
                 timestamp = name
                 break
+
         if timestamp is None:
             datetime_columns = [
                 name for name in df.columns
-                if pd.api.types.is_datetime64_any_dtype(df[name])
+                if not name.startswith("_")
+                and pd.api.types.is_datetime64_any_dtype(df[name])
             ]
             timestamp = datetime_columns[0] if datetime_columns else None
+
+    # Определяем станцию, если это разрешено
     station = mapping.station_column
-    if station is None:
+
+    if station is None and mapping.detect_station_column:
         for name in ("station_id", "station", "station_code", "site_id"):
             if name in df.columns:
                 station = name
                 break
+
+    # Список колонок, которые не являются показателями воды
+    excluded = {
+        "id",
+        "target",
+        "potability",
+        "water_potability",
+        "label",
+        "class",
+        "measured_at",
+        "timestamp",
+        "datetime",
+        "date",
+        "time",
+        "station_id",
+        "station",
+        "station_code",
+        "site_id",
+    }
+
     parameters = mapping.parameter_columns
+
     if parameters is None:
         parameters = [
             name for name in df.columns
             if not name.startswith("_")
+            and name.lower() not in excluded
             and name not in {timestamp, station}
             and pd.api.types.is_numeric_dtype(df[name])
             and not pd.api.types.is_bool_dtype(df[name])
         ]
-    return AnalyticsMapping(timestamp, station, parameters)
+
+    parameters = [
+        name for name in parameters
+        if name in df.columns
+        and name.lower() not in excluded
+        and name not in {timestamp, station}
+        and pd.api.types.is_numeric_dtype(df[name])
+        and not pd.api.types.is_bool_dtype(df[name])
+    ]
+
+    return AnalyticsMapping(
+        timestamp_column=timestamp,
+        station_column=station,
+        parameter_columns=parameters,
+        detect_station_column=mapping.detect_station_column,
+    )
 
 
 def dataset_summary(df: pd.DataFrame, mapping: AnalyticsMapping, manifest: dict) -> pd.DataFrame:
@@ -188,12 +238,14 @@ def build_marts(
     written = {}
     for name, build in builders.items():
         frame = build()
-        if frame is None or frame.empty:
-            continue
         path = mart_dir(name, dataset_id, batch_id, data_root) / "data.parquet"
+
+        if frame is None or frame.empty:
+            path.unlink(missing_ok=True)
+            continue
+
         _write_frame(path, frame)
         written[name] = {"path": str(path), "rows": int(len(frame))}
-
     summary = {
         "dataset_id": dataset_id,
         "batch_id": batch_id,
@@ -212,26 +264,52 @@ def build_marts(
     return summary
 
 
-def validate_marts(dataset_id: str, batch_id: str, data_root: str | None = None) -> dict:
+def validate_marts(
+    dataset_id: str,
+    batch_id: str,
+    data_root: str | None = None,
+    mapping: AnalyticsMapping | None = None,
+) -> dict:
     df, _ = load_curated(dataset_id, batch_id, data_root)
-    summary_path = mart_dir("dataset_summary", dataset_id, batch_id, data_root) / "data.parquet"
+    mapping = detect_mapping(df, mapping)
+
+    summary_path = mart_dir(
+        "dataset_summary", dataset_id, batch_id, data_root
+    ) / "data.parquet"
+
     if not summary_path.is_file():
         raise ValueError("dataset_summary mart is missing")
+
     summary = pd.read_parquet(summary_path).iloc[0]
+
     if int(summary["row_count"]) != len(df):
         raise ValueError("dataset_summary.row_count does not match Gold row count")
 
-    daily_path = mart_dir("daily_metrics", dataset_id, batch_id, data_root) / "data.parquet"
-    if daily_path.is_file():
+    daily_path = mart_dir(
+        "daily_metrics", dataset_id, batch_id, data_root
+    ) / "data.parquet"
+
+    if daily_path.is_file() and mapping.timestamp_column:
         daily = pd.read_parquet(daily_path)
-        mapping = detect_mapping(df)
+
+        valid_dates = pd.to_datetime(
+            df[mapping.timestamp_column],
+            errors="coerce",
+            utc=True,
+        ).notna()
+
         expected = int(
-            df[mapping.parameter_columns]
-            .loc[pd.to_datetime(df[mapping.timestamp_column], errors="coerce", utc=True).notna()]
+            df.loc[valid_dates, mapping.parameter_columns]
             .notna()
             .sum()
             .sum()
         )
-        if int(daily["measurement_count"].sum()) != expected:
-            raise ValueError("daily_metrics measurement_count does not match Gold values")
+
+        actual = int(daily["measurement_count"].sum())
+
+        if actual != expected:
+            raise ValueError(
+                "daily_metrics measurement_count does not match Gold values"
+            )
+
     return {"validated": True, "rows": int(len(df))}

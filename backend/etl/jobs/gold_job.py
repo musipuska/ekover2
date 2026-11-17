@@ -31,10 +31,8 @@ CURATED_DIR = "measurements"
 def profile_path(ctx: RunContext):
     return ctx.layer_dir("gold") / "profile.json"
 
-
 def curated_path(ctx: RunContext):
-    return ctx.published_dir("gold") / CURATED_DIR
-
+    return ctx.version_dir("gold") / CURATED_DIR
 
 def run_gold(
     ctx: RunContext,

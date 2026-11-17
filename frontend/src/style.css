@@ -1003,3 +1003,93 @@ tr:hover td {
     grid-template-columns: 1fr;
   }
 }
+
+/* Улучшение читаемости таблиц */
+
+.dataset-name {
+  color: #2dd4bf;
+}
+
+.dataset-name strong {
+  color: #dcefeb;
+}
+
+.dataset-name span {
+  color: #91aaaf;
+}
+
+.table-action {
+  color: #55d6b9;
+}
+
+.table-action:hover {
+  color: #8ce9dc;
+  text-decoration: underline;
+}
+
+td {
+  color: #c5d9d7;
+}
+
+th {
+  color: #91b9b5;
+}
+
+/* Читаемость дополнительных элементов */
+
+.field-label {
+  color: #b5ceca;
+}
+
+.empty-state strong {
+  color: #dcefeb;
+}
+
+.empty-state span {
+  color: #91aaaf;
+}
+
+/* Выпадающий список в тёмной теме */
+
+select.text-input {
+  background: #0d2934;
+  color: #eff8f6;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  color-scheme: dark;
+}
+
+select.text-input option {
+  background: #0d2934;
+  color: #eff8f6;
+}
+
+select.text-input:focus {
+  border-color: #2dd4bf;
+  outline: none;
+}
+
+/* Таблица профиля */
+
+.profile-result table {
+  min-width: 850px;
+}
+
+.profile-result td {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.profile-result th {
+  font-size: 11px;
+}
+
+.chart-container {
+  width: 100%;
+  height: 370px;
+  margin: 30px 0 45px;
+  padding: 20px 15px 25px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  box-sizing: border-box;
+}

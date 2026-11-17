@@ -5,7 +5,7 @@ import pandas as pd
 
 FEATURE_VERSION = "1.0"
 IDENTIFIER_COLUMNS = ("_record_hash", "_source_row_number")
-
+TARGET_COLUMNS = ("Potability",)
 
 @dataclass
 class FeatureConfig:
@@ -27,27 +27,44 @@ class FeatureConfig:
 
 
 def select_parameters(df: pd.DataFrame, config: FeatureConfig) -> list[str]:
+    excluded = {
+        name.lower()
+        for name in config.exclude_columns
+    }
+    excluded.update(name.lower() for name in TARGET_COLUMNS)
+    excluded.update(
+        name.lower()
+        for name in (config.timestamp_column, config.station_column)
+        if name
+    )
+
     if config.parameter_columns is not None:
-        missing = [name for name in config.parameter_columns if name not in df.columns]
+        missing = [
+            name for name in config.parameter_columns
+            if name not in df.columns
+        ]
         if missing:
             raise ValueError(f"Unknown parameter columns: {missing}")
-        return list(config.parameter_columns)
 
-    skip = set(config.exclude_columns)
-    skip.update(name for name in (config.timestamp_column, config.station_column) if name)
-    selected = [
-        name
-        for name in df.columns
-        if not name.startswith("_")
-        and name not in skip
-        and pd.api.types.is_numeric_dtype(df[name])
-        and not pd.api.types.is_bool_dtype(df[name])
-        and df[name].notna().any()
-    ]
+        selected = [
+            name for name in config.parameter_columns
+            if name.lower() not in excluded
+        ]
+    else:
+        selected = [
+            name
+            for name in df.columns
+            if not name.startswith("_")
+            and name.lower() not in excluded
+            and pd.api.types.is_numeric_dtype(df[name])
+            and not pd.api.types.is_bool_dtype(df[name])
+            and df[name].notna().any()
+        ]
+
     if not selected:
         raise ValueError("No numeric parameter columns available for features")
-    return selected
 
+    return selected
 
 def _season(month: pd.Series) -> pd.Series:
     return month.map({12: 0, 1: 0, 2: 0, 3: 1, 4: 1, 5: 1, 6: 2, 7: 2, 8: 2}).fillna(3)

@@ -182,6 +182,10 @@ export const api = {
     return request(`/ml/anomalies${makeQuery(params)}`);
   },
 
+  getMLAnalytics(params = {}) {
+    return request(`/ml/analytics${makeQuery(params)}`);
+  },
+
   getAnomaly(predictionId) {
     return request(
       `/ml/anomalies/${encodeURIComponent(predictionId)}`
