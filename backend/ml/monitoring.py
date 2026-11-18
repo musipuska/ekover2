@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -66,6 +67,7 @@ def monitor_batch(
         "batch_id": batch_id,
         "model_name": model_name,
         "model_version": metadata["model_version"],
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "feature_drift": drift,
         "drifted_features": [name for name, item in drift.items() if item["status"] in {"warning", "alert"}],
         "overall_status": "ok",

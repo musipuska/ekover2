@@ -123,6 +123,8 @@ def read_predictions(
     batch_id: str | None = None,
     only_anomalies: bool = False,
     data_root: str | None = None,
+    columns: list[str] | None = None,
+    model_version: str | None = None,
 ) -> pd.DataFrame:
     root = Path(data_root or settings.DATA_LAKE_PATH) / "predictions"
     frames = []
@@ -134,10 +136,19 @@ def read_predictions(
             continue
         if batch_id and parts.get("batch_id") != batch_id:
             continue
-        frame = pd.read_parquet(path)
+        if model_version and parts.get("model_version") != model_version:
+            continue
+        needed = None
+        if columns is not None:
+            needed = list(dict.fromkeys([*columns, "is_anomaly", "anomaly_score"]))
+        frame = pd.read_parquet(path, columns=needed)
         if only_anomalies:
             frame = frame[frame["is_anomaly"]]
         frames.append(frame)
     if not frames:
         return pd.DataFrame()
-    return pd.concat(frames, ignore_index=True).sort_values("anomaly_score").reset_index(drop=True)
+    result = pd.concat(frames, ignore_index=True).sort_values("anomaly_score").reset_index(drop=True)
+    if columns is not None:
+        extra = [name for name in ("is_anomaly", "anomaly_score") if name not in columns]
+        result = result.drop(columns=extra)
+    return result
