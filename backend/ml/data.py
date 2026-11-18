@@ -26,6 +26,7 @@ def load_curated(
     batch_id: str,
     data_root: str | None = None,
     allow_warning: bool = True,
+    columns: list[str] | None = None,
 ) -> tuple[pd.DataFrame, dict]:
     directory = gold_batch_dir(dataset_id, batch_id, data_root)
     manifest = read_json(directory / "manifest.json")
@@ -40,5 +41,5 @@ def load_curated(
             "Batch не прошёл quality gate",
             {"quality_status": status},
         )
-    frame = pd.read_parquet(resolve_published(directory) / "measurements")
+    frame = pd.read_parquet(resolve_published(directory) / "measurements", columns=columns)
     return frame, manifest

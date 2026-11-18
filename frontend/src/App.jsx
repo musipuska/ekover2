@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import {
-  LayoutDashboard,
   Database,
   FileSpreadsheet,
   Upload,
@@ -14,12 +13,34 @@ import {
 } from "lucide-react";
 
 import Sidebar from "./components/Sidebar";
+import DashboardProvider from "./context/DashboardProvider";
+import { LoadingState } from "./components/analytics/States";
 import StatCard from "./components/StatCard";
 import { api } from "./services/api";
 
 import "./style.css";
+import "./styles/dashboard.css";
+
+const OverviewDashboard = lazy(() => import("./pages/OverviewDashboard"));
+const WaterQualityDashboard = lazy(() => import("./pages/WaterQualityDashboard"));
+const DataQualityDashboard = lazy(() => import("./pages/DataQualityDashboard"));
+const MLAnalyticsDashboard = lazy(() => import("./pages/MLAnalyticsDashboard"));
+const PipelineDashboard = lazy(() => import("./pages/PipelineDashboard"));
+
+const DASHBOARD_PAGES = {
+  overview: OverviewDashboard,
+  water: WaterQualityDashboard,
+  quality: DataQualityDashboard,
+  ml: MLAnalyticsDashboard,
+  etl: PipelineDashboard,
+};
 
 const pageTitles = {
+  overview: "Overview",
+  water: "Water Quality",
+  quality: "Data Quality",
+  ml: "ML & Anomalies",
+  etl: "ETL Monitoring",
   dashboard: "Главная",
   upload: "Загрузка данных",
   datasets: "Хранилище данных",
@@ -55,7 +76,12 @@ function Status({ value }) {
 }
 
 export default function App() {
-  const [activePage, setActivePage] = useState("dashboard");
+  const [activePage, setActivePage] = useState(() => {
+    const page = window.location.hash.replace("#/", "");
+    return pageTitles[page] ? page : "dashboard";
+  });
+  const [navParams, setNavParams] = useState({});
+
   const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -69,6 +95,14 @@ export default function App() {
   const [quality, setQuality] = useState(null);
   const [qualityError, setQualityError] = useState("");
   const [search, setSearch] = useState("");
+
+  const navigate = useCallback((page, params = {}) => {
+    setActivePage(page);
+    setNavParams(params);
+    setError("");
+    setMessage("");
+    window.location.hash = `/${page}`;
+  }, []);
 
 
   async function loadDatasets() {
@@ -91,7 +125,10 @@ export default function App() {
   }
 
   useEffect(() => {
-    loadDatasets();
+    api
+      .getDatasets()
+      .then((result) => setDatasets(Array.isArray(result) ? result : result.items || []))
+      .catch((err) => setError(err.message));
   }, []);
 
   async function handleUpload(event) {
@@ -545,16 +582,11 @@ export default function App() {
     </section>
   );
 
+  const Dashboard = DASHBOARD_PAGES[activePage];
+
   return (
     <div className="app-layout">
-      <Sidebar
-        activePage={activePage}
-        onNavigate={(page) => {
-          setActivePage(page);
-          setError("");
-          setMessage("");
-        }}
-      />
+      <Sidebar activePage={activePage} onNavigate={(page) => navigate(page)} />
 
       <main className="main-area">
         <header className="topbar">
@@ -591,6 +623,13 @@ export default function App() {
             </div>
           )}
 
+          {Dashboard && (
+            <DashboardProvider navigate={navigate} navParams={navParams}>
+              <Suspense fallback={<LoadingState height={240} />}>
+                <Dashboard />
+              </Suspense>
+            </DashboardProvider>
+          )}
           {activePage === "dashboard" && renderDashboard()}
           {activePage === "upload" && renderUpload()}
           {activePage === "datasets" && renderDatasets()}
