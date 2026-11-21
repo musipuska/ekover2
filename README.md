@@ -238,6 +238,21 @@ http://localhost:5173
 
 Пользователь может открыть веб-интерфейс, загрузить CSV-файл, дождаться завершения обработки и просмотреть сформированные результаты.
 
+## Аналитические дашборды
+
+В боковом меню, группа «АНАЛИТИКА»: Executive Overview, Water Quality, Data Quality, ML & Anomalies, ETL Monitoring. Все данные берутся из реальных источников (БД метаданных, data lake, витрины, ML-реестр); при их отсутствии показывается «Нет данных» или N/A.
+
+Документация: [`docs/analytics/`](docs/analytics) — аудит, архитектура, дашборды, API, lineage, тестирование.
+
+Адрес API во frontend задаётся переменной `VITE_API_URL` (по умолчанию `http://127.0.0.1:8000/api/v1`).
+
+Тесты:
+
+```bash
+pytest tests --ignore=tests/test_airflow_dags.py
+cd frontend && npm test && npx eslint . && npm run build
+```
+
 ## API
 
 Взаимодействие frontend и backend осуществляется через REST API.
