@@ -1,0 +1,77 @@
+{
+  "rows": 3276,
+  "iforest_flagged": 66,
+  "tukey_any_flagged": 325,
+  "z3_any_flagged": 115,
+  "rows_with_null": 1265,
+  "iforest_vs_tukey": {
+    "a": 66,
+    "b": 325,
+    "intersection": 48,
+    "jaccard": 0.13994169096209913
+  },
+  "iforest_vs_z3": {
+    "a": 66,
+    "b": 115,
+    "intersection": 25,
+    "jaccard": 0.16025641025641027
+  },
+  "iforest_vs_tukey_2plus": {
+    "a": 66,
+    "b": 39,
+    "intersection": 21,
+    "jaccard": 0.25
+  },
+  "dominant_parameter_of_flagged": {
+    "sulfate": 16,
+    "conductivity": 9,
+    "solids": 9,
+    "hardness": 8,
+    "ph": 7,
+    "organic_carbon": 5,
+    "chloramines": 5,
+    "trihalomethanes": 5,
+    "turbidity": 2
+  },
+  "flag_rate_by_missingness": {
+    "с пропусками": {
+      "rows": 1265,
+      "flagged": 18,
+      "share": 0.014229249011857707
+    },
+    "без пропусков": {
+      "rows": 2011,
+      "flagged": 48,
+      "share": 0.023868722028841372
+    }
+  },
+  "seed_stability_jaccard_mean": 0.598677343231157,
+  "seed_stability_jaccard_min": 0.5348837209302325,
+  "seed_stability_jaccard_max": 0.65,
+  "contamination_grid": {
+    "0.005": {
+      "flagged": 17,
+      "threshold_score": -0.00042142487484275737
+    },
+    "0.01": {
+      "flagged": 33,
+      "threshold_score": -0.000689559865125533
+    },
+    "0.02": {
+      "flagged": 66,
+      "threshold_score": -2.8277900607998063e-05
+    },
+    "0.05": {
+      "flagged": 164,
+      "threshold_score": -2.412521138883683e-05
+    },
+    "0.1": {
+      "flagged": 328,
+      "threshold_score": -2.5259955168333015e-05
+    }
+  },
+  "mean_tukey_hits_flagged": 1.0757575757575757,
+  "mean_tukey_hits_normal": 0.09190031152647975,
+  "mean_score_flagged": -0.020127367481614457,
+  "mean_score_normal": 0.0977438589732237
+}

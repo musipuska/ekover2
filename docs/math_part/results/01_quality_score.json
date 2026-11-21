@@ -1,0 +1,89 @@
+{
+  "rows": 3276,
+  "rules_total": 8,
+  "passed": 6,
+  "failed": 0,
+  "skipped": 2,
+  "quality_score": 0.75,
+  "rule_coverage": 0.75,
+  "critical_failures": 0,
+  "gate": "passed",
+  "ph_null_ratio": 0.14987789987789987,
+  "null_cells": 1434,
+  "null_cells_by_column": {
+    "ph": 491,
+    "sulfate": 781,
+    "trihalomethanes": 162
+  },
+  "rules": [
+    {
+      "rule": "dataset_not_empty",
+      "rule_type": "min_rows",
+      "severity": "critical",
+      "status": "passed",
+      "failed_rows": 0,
+      "observed_value": 3276
+    },
+    {
+      "rule": "ph_physical_range",
+      "rule_type": "between",
+      "severity": "warning",
+      "status": "passed",
+      "failed_rows": 0,
+      "observed_value": 0
+    },
+    {
+      "rule": "hardness_non_negative",
+      "rule_type": "between",
+      "severity": "warning",
+      "status": "passed",
+      "failed_rows": 0,
+      "observed_value": 0
+    },
+    {
+      "rule": "turbidity_non_negative",
+      "rule_type": "between",
+      "severity": "warning",
+      "status": "passed",
+      "failed_rows": 0,
+      "observed_value": 0
+    },
+    {
+      "rule": "conductivity_non_negative",
+      "rule_type": "between",
+      "severity": "warning",
+      "status": "passed",
+      "failed_rows": 0,
+      "observed_value": 0
+    },
+    {
+      "rule": "temperature_physical_range",
+      "rule_type": "between",
+      "severity": "warning",
+      "status": "skipped",
+      "failed_rows": null,
+      "observed_value": null
+    },
+    {
+      "rule": "ph_null_ratio",
+      "rule_type": "max_null_ratio",
+      "severity": "warning",
+      "status": "passed",
+      "failed_rows": 491,
+      "observed_value": 0.149878
+    },
+    {
+      "rule": "measured_at_not_in_future",
+      "rule_type": "not_in_future",
+      "severity": "warning",
+      "status": "skipped",
+      "failed_rows": null,
+      "observed_value": null
+    }
+  ],
+  "grid_n": 8,
+  "grid_example": {
+    "failed_warning=2,skipped=2": 0.5,
+    "failed_warning=0,skipped=2": 0.75
+  }
+}
